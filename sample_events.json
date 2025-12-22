@@ -1,0 +1,12 @@
+{
+  "Records": [
+    {
+      "eventTime": "2024-05-01T12:15:00Z",
+      "eventID": "demo-daily-1",
+      "s3": {
+        "bucket": {"name": "sample-ingest"},
+        "object": {"key": "acme/reports/report_20240501.csv", "eTag": "etag-1", "versionId": "1"}
+      }
+    }
+  ]
+}
