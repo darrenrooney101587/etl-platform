@@ -1,0 +1,36 @@
+[
+  {
+    "model": "monitoring.monitoringfileschemadefinition",
+    "pk": 1,
+    "fields": {
+      "name": "sample_schema",
+      "description": "Sample schema for local testing",
+      "definition": {
+        "strict": true,
+        "columns": [
+          {"name": "id", "required": true, "unique": true},
+          {"name": "age", "required": true, "min": 0, "max": 120},
+          {"name": "score", "required": true, "min": 50}
+        ]
+      },
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "monitoring.monitoringfile",
+    "pk": 1,
+    "fields": {
+      "s3_url": "",
+      "file_name": "sample_monitoring_file.csv",
+      "range": "daily",
+      "is_active": true,
+      "agency": null,
+      "agency_slug": "sample-agency",
+      "notify_slack": false,
+      "is_missing": false,
+      "latest_data_quality_score": null,
+      "schema_definition": 1
+    }
+  }
+]
