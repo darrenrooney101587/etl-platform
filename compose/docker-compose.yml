@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  file-processing:
+    image: etl-file-processing
+    build:
+      context: ../
+      dockerfile: docker/file-processing.Dockerfile
+    volumes:
+      - ../packages/file_processing:/app/packages/file_processing
+      - ../packages/etl_core:/app/packages/etl_core
+
+  data-pipeline:
+    image: etl-data-pipeline
+    build:
+      context: ../
+      dockerfile: docker/data-pipeline.Dockerfile
+    volumes:
+      - ../packages/data_pipeline:/app/packages/data_pipeline
+      - ../packages/etl_core:/app/packages/etl_core
+
+  observability:
+    image: etl-observability
+    build:
+      context: ../
+      dockerfile: docker/observability.Dockerfile
+    volumes:
+      - ../packages/observability:/app/packages/observability
+      - ../packages/etl_core:/app/packages/etl_core
