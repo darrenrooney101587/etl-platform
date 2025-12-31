@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from runners import health, ingest, transforms
+from data_pipeline.runners import health, ingest, transforms
 
 
 def _build_parser() -> argparse.ArgumentParser:
