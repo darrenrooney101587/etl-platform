@@ -1,10 +1,8 @@
 import sys
 from unittest.mock import MagicMock
+from tests.unit.conftest import setup_mocks
 
-# Mock external dependencies
-for module in ['django', 'django.db', 'django.conf', 'django_core', 'django_core.settings', 'django_core.settings.base', 'botocore', 'botocore.exceptions', 'boto3']:
-    if module not in sys.modules:
-        sys.modules[module] = MagicMock()
+setup_mocks()
 
 import unittest
 from data_pipeline.config.factory import create_s3_processor, create_employment_history_processor

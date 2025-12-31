@@ -1,9 +1,12 @@
-from __future__ import annotations
+"""Pytest configuration for the test suite.
 
+Ensure the repository root is on sys.path so application packages (like `service`)
+can be imported regardless of how pytest is invoked by IDEs or CI.
+"""
+
+import os
 import sys
-from pathlib import Path
 
-
-PACKAGE_ROOT = Path(__file__).resolve().parents[1]
-if str(PACKAGE_ROOT) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_ROOT))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)

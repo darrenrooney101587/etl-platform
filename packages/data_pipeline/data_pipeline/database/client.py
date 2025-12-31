@@ -20,7 +20,8 @@ class DatabaseClient:
     :type db_alias: str
     """
 
-    def __init__(self, db_alias: str = "bms") -> None:
+    def __init__(self, connections: Optional[Any] = None, db_alias: str = "bms") -> None:
+        self._connections = connections or django_connections
         self._db_alias = db_alias
 
     def _log_db_connections(self, context: str, db_alias: str = "bms") -> None:
@@ -30,7 +31,7 @@ class DatabaseClient:
         :type context: str
         """
         try:
-            db_settings = connections[db_alias].settings_dict
+            db_settings = self._connections[db_alias].settings_dict
             db_info = {
                 self._db_alias: {
                     "USER": db_settings.get("USER"),
@@ -119,7 +120,7 @@ class DatabaseClient:
         """
 
         try:
-            with connections["bms"].cursor() as cursor:
+            with self._connections[self._db_alias].cursor() as cursor:
                 cursor.execute(sql_query, [agency_id])
                 columns = [col[0] for col in cursor.description]
                 results: List[Dict[str, Any]] = []
@@ -150,7 +151,7 @@ class DatabaseClient:
                     WHERE {where_clause} = %s
                     """
         try:
-            with connections[self._db_alias].cursor() as cursor:
+            with self._connections[self._db_alias].cursor() as cursor:
                 cursor.execute(sql_query, [int(agency_id)])
                 result = cursor.fetchone()
                 if result:
@@ -198,7 +199,7 @@ class DatabaseClient:
         """
 
         try:
-            with connections[self._db_alias].cursor() as cursor:
+            with self._connections[self._db_alias].cursor() as cursor:
                 cursor.execute(sql_query, [agency_id])
                 columns = [col[0] for col in cursor.description]
                 results: List[Dict[str, Any]] = []

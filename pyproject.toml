@@ -2,17 +2,23 @@
 name = "etl-platform"
 version = "0.1.0"
 description = "Root for ETL Platform. Use this for local development and tooling."
-authors = ["arren.rooney@benchmarkanalytics.com"]
+authors = ["darren.rooney@benchmarkanalytics.com"]
 package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
 # Local path dependencies for development convenience
-etl-core = {path = "./packages/etl_core", develop = true}
-file-processing = {path = "./packages/file_processing", develop = true}
-data-pipeline = {path = "./packages/data_pipeline", develop = true}
-observability = {path = "./packages/observability", develop = true}
- etl-database-schema = {git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git"}
+etl-core = { path = "./packages/etl_core", develop = true }
+file-processing = { path = "./packages/file_processing", develop = true }
+data-pipeline = { path = "./packages/data_pipeline", develop = true }
+observability = { path = "./packages/observability", develop = true }
+
+[tool.poetry.group.schema]
+optional = true
+
+[tool.poetry.group.schema.dependencies]
+# External Django ORM + migrations package (schema contract)
+etl-database-schema = { git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4"

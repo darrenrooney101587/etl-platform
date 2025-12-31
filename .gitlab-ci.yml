@@ -1,0 +1,31 @@
+image: python:3.10
+stages: [test]
+
+variables:
+  POETRY_VERSION: "2.1.1"
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  POETRY_CACHE_DIR: ".cache/pypoetry"
+  POETRY_GIT_USE_SYSTEM_GIT: "1"
+  GIT_SSH_COMMAND: 'ssh -i /root/.ssh/id_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes'
+  AWS_REGION: "us-east-1"
+
+cache:
+  key: poetry-cache
+  policy: pull
+  paths:
+    - .venv
+    - .cache/pip
+    - .cache/pypoetry
+
+test:
+  stage: test
+  before_script:
+    - apt-get update && apt-get install -y git openssh-client ca-certificates
+    - mkdir -p /root/.ssh
+    - echo "$GIT_SSH_PRIVATE_KEY" > /root/.ssh/id_ci
+    - chmod 600 /root/.ssh/id_ci
+    - ssh-keyscan -t rsa,ed25519 gitlab.dev-benchmarkanalytics.com >> /root/.ssh/known_hosts
+    - python -m pip install -U pip "poetry==${POETRY_VERSION}"
+    - poetry install --no-interaction --no-ansi --with dev
+  script:
+    - poetry run pytest -q -m "not integration"
