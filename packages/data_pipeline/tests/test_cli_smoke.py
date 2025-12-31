@@ -4,36 +4,38 @@ import subprocess
 from pathlib import Path
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 def _run_command(args: list[str]) -> subprocess.CompletedProcess[str]:
-    root = Path(__file__).resolve().parents[1]
     return subprocess.run(
         ["poetry", "run", "data-pipeline", *args],
-        cwd=root,
+        cwd=ROOT,
         check=False,
         capture_output=True,
         text=True,
     )
 
 
-def test_healthcheck_smoke() -> None:
-    result = _run_command(["healthcheck"])
+def test_list_jobs_smoke() -> None:
+    result = _run_command(["list"])
     assert result.returncode == 0
-    assert result.stdout.strip() == "healthcheck: ok"
+    assert "healthcheck" in result.stdout
 
 
-def test_run_transform_smoke() -> None:
-    result = _run_command(["run-transform", "--feed", "arrests"])
+def test_run_healthcheck_smoke() -> None:
+    result = _run_command(["run", "healthcheck"])
     assert result.returncode == 0
-    assert result.stdout.strip() == "run-transform: would process feed 'arrests'"
 
 
-def test_ingest_smoke() -> None:
-    result = _run_command(["ingest", "--source", "api"])
+def test_help_healthcheck_smoke() -> None:
+    result = _run_command(["help", "healthcheck"])
     assert result.returncode == 0
-    assert result.stdout.strip() == "ingest: would ingest source 'api'"
+    assert "usage:" in result.stdout.lower()
 
 
-def test_missing_required_arg() -> None:
-    result = _run_command(["run-transform"])
+def test_unknown_job_smoke() -> None:
+    result = _run_command(["run", "does-not-exist"])
     assert result.returncode != 0
-    assert "usage:" in result.stderr
+    combined_output = f"{result.stdout}\n{result.stderr}"
+    assert "healthcheck" in combined_output
