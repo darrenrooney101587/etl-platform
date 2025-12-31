@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Combined transforms + ingestion runtime lane"
 authors = ["Admin <admin@example.com>"]
 readme = "README.md"
-packages = [{include = "data_pipeline", from = "src"}]
+packages = [{include = "data_pipeline"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
