@@ -4,18 +4,14 @@ Unit tests for the DatabaseClient in data_pipeline.database.client.
 These tests focus on database query functionality and data processing utilities
 exposed by the DatabaseClient methods, using injected mock connections for isolation.
 """
-
-import sys
-from unittest.mock import MagicMock
-from tests.unit.conftest import setup_mocks
+from packages.data_pipeline.database.client import DatabaseClient
+from packages.data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 
 import os
 import unittest
 from unittest.mock import MagicMock, Mock
-
-from data_pipeline.database.client import DatabaseClient
 
 
 class TestDatabaseClient(unittest.TestCase):
@@ -282,4 +278,5 @@ class TestDatabaseClient(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    import unittest
     unittest.main()

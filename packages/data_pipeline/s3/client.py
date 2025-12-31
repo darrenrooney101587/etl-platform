@@ -7,7 +7,6 @@ from typing import Dict, List, Any, Optional, Union
 import boto3
 from botocore.exceptions import NoCredentialsError
 
-from data_pipeline.config.config import S3Config, EmploymentHistoryConfig
 
 logger = logging.getLogger(__name__)
 

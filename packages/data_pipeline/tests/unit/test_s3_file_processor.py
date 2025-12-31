@@ -4,23 +4,16 @@ Tests for the S3FileProcessor class.
 This module contains unit tests for all methods in the S3FileProcessor class,
 focusing on individual method behavior and file processing functionality.
 """
-
-import sys
-from unittest.mock import MagicMock
-from tests.unit.conftest import setup_mocks, MockClientError
+from packages.data_pipeline.config.config import S3Config
+from packages.data_pipeline.processors.s3_file_processor import S3FileProcessor
+from packages.data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 
-import time
 import unittest
-from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List
 from unittest.mock import Mock, patch, MagicMock, call
 
-from data_pipeline.config.config import S3Config
 from botocore.exceptions import ClientError
-
-from data_pipeline.processors.s3_file_processor import S3FileProcessor
 
 
 class TestS3FileProcessor(unittest.TestCase):
@@ -333,4 +326,5 @@ class TestS3FileProcessor(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    import unittest
     unittest.main()

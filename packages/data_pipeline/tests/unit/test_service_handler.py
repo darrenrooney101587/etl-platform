@@ -1,13 +1,14 @@
 import sys
 from unittest.mock import MagicMock
-from tests.unit.conftest import setup_mocks
+
+
+from packages.data_pipeline.service_handler import ServiceHandler
+from packages.data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 
 import unittest
 from unittest.mock import MagicMock, Mock, patch
-
-from data_pipeline.service_handler import ServiceHandler
 
 
 class TestServiceHandler(unittest.TestCase):
@@ -100,4 +101,5 @@ class TestServiceHandler(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    import unittest
     unittest.main()

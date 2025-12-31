@@ -2,9 +2,9 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from data_pipeline.config.config import EmploymentHistoryConfig
-from data_pipeline.database import client
-from data_pipeline.s3.client import S3Client
+from packages.data_pipeline.config.config import EmploymentHistoryConfig
+from packages.data_pipeline.database import client
+from packages.data_pipeline.s3.client import S3Client
 
 logger = logging.getLogger(__name__)
 

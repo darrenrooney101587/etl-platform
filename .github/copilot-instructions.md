@@ -42,3 +42,9 @@ Maintain a Python monorepo with multiple deployable job modules and images, usin
 - When touching function signatures, add type hints (minimal).
 - Avoid introducing new abstractions during migration.
 - Keep operational scripts explicit and readable.
+
+## Testing
+
+- Use **unittest.TestCase** for all tests.
+- Include a `if __name__ == "__main__": unittest.main()` block.
+- Use DI to mock all external resources.

@@ -1,8 +1,9 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from django.db import connections as django_connections, connections
-from data_pipeline.support.utilities import get_env_bms_id_field, get_env_s3_field
+from django.db import connections as django_connections
+
+from packages.data_pipeline.support.utilities import get_env_bms_id_field, get_env_s3_field
 
 logger = logging.getLogger(__name__)
 

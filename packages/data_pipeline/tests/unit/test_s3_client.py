@@ -4,21 +4,15 @@ Tests for the S3Client class.
 This module contains unit tests for all methods in the S3Client class,
 focusing on individual method behavior rather than end-to-end processes.
 """
-
-import sys
-from unittest.mock import MagicMock
-from tests.unit.conftest import setup_mocks, MockNoCredentialsError
-
-setup_mocks()
-
-import os
 import unittest
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from data_pipeline.config.config import S3Config, EmploymentHistoryConfig
-from data_pipeline.s3.client import S3Client
 from botocore.exceptions import NoCredentialsError
+
+from packages.data_pipeline.config.config import S3Config, EmploymentHistoryConfig
+from packages.data_pipeline.s3.client import S3Client
+
 
 class TestBaseS3Client(unittest.TestCase):
     """Test cases for S3Client class methods.
@@ -307,4 +301,5 @@ class TestBaseS3Client(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    import unittest
     unittest.main()

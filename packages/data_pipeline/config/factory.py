@@ -9,9 +9,9 @@ settings and provided parameters.
 import os
 from typing import Optional
 
-from data_pipeline.config.config import EmploymentHistoryConfig, S3Config
-from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
-from data_pipeline.processors.s3_file_processor import S3FileProcessor
+from packages.data_pipeline.config.config import S3Config, EmploymentHistoryConfig
+from packages.data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
+from packages.data_pipeline.processors.s3_file_processor import S3FileProcessor
 
 
 def create_s3_processor(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from data_pipeline.jobs import healthcheck
+from packages.data_pipeline.jobs import healthcheck
 
 
 @dataclass(frozen=True)
