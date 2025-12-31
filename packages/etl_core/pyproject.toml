@@ -1,14 +1,14 @@
 [tool.poetry]
-build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core"]
-[build-system]
-
-python = "^3.10"
-[tool.poetry.dependencies]
-
-packages = [{include = "etl_core", from = "src"}]
-readme = "README.md"
-authors = ["Admin <admin@example.com>"]
-description = "Pure Python shared utilities for ETL runtimes"
-version = "0.1.0"
 name = "etl-core"
+version = "0.1.0"
+description = "Pure Python shared utilities for ETL runtimes"
+authors = ["Admin <admin@example.com>"]
+readme = "README.md"
+packages = [{include = "etl_core", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -2,6 +2,13 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install poetry
 RUN pip install poetry
 
@@ -14,7 +21,7 @@ COPY packages/data_pipeline /app/packages/data_pipeline
 # Install dependencies
 WORKDIR /app/packages/data_pipeline
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
+    && poetry install --no-interaction --no-ansi --extras db
 
-# Placeholder entrypoint
-CMD ["echo", "Data Pipeline Module Started"]
+# Entrypoint
+CMD ["data-pipeline-get-s3-files", "--help"]

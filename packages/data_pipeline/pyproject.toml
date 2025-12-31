@@ -9,14 +9,17 @@ packages = [{include = "data_pipeline", from = "src"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 etl-core = {path = "../etl_core", develop = true}
-django = {version = "^4.2", optional = true}
-# Local development
-# etl-database-schema = {path = "../../../../benchmark/repositories/etl-database-schema", develop = true, optional = true}
-# Production / CI
-etl-database-schema = {git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git", rev = "v0.3.3", optional = true}
+django = "^4.2"
+psycopg2-binary = "^2.9"
+boto3 = "^1.37"
+python-json-logger = "^4.0"
+etl-database-schema = {git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git"}
 
 [tool.poetry.extras]
 db = ["etl-database-schema", "django"]
+
+[tool.poetry.scripts]
+data-pipeline-get-s3-files = "data_pipeline.cli.get_s3_files:main"
 
 [build-system]
 requires = ["poetry-core"]
