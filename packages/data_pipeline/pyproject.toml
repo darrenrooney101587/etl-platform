@@ -8,7 +8,7 @@ packages = [{include = "data_pipeline"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-etl-core = {path = "../etl_core", develop = true}
+etl-core = {path = "../etl_core", develop = false}
 django = "^4.2"
 psycopg2-binary = "^2.9"
 boto3 = "^1.37"
