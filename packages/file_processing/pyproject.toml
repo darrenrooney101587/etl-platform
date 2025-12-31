@@ -8,7 +8,7 @@ packages = [{include = "file_processing", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-etl-core = {path = "../etl_core", develop = true}
+etl-core = {path = "../etl_core", develop = false}
 
 [build-system]
 requires = ["poetry-core"]
