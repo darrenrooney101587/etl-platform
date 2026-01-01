@@ -1,7 +1,7 @@
-from packages.data_pipeline.config.factory import create_s3_processor, create_employment_history_processor
-from packages.data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
-from packages.data_pipeline.processors.s3_file_processor import S3FileProcessor
-from packages.data_pipeline.tests.unit.conftest import setup_mocks
+from data_pipeline.config.factory import create_s3_processor, create_employment_history_processor
+from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
+from data_pipeline.processors.s3_file_processor import S3FileProcessor
+from data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 

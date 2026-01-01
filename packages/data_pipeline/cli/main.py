@@ -2,7 +2,7 @@ import argparse
 import sys
 from typing import Iterable
 
-from packages.data_pipeline.jobs.registry import get_registry
+from data_pipeline.jobs.registry import get_registry
 
 
 def _list_jobs() -> int:

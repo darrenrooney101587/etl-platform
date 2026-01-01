@@ -2,8 +2,8 @@ import sys
 from unittest.mock import MagicMock
 
 
-from packages.data_pipeline.service_handler import ServiceHandler
-from packages.data_pipeline.tests.unit.conftest import setup_mocks
+from data_pipeline.service_handler import ServiceHandler
+from data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 

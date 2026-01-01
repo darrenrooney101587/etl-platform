@@ -4,9 +4,9 @@ Tests for the EmploymentHistoryProcessor class.
 This module contains unit tests for all methods in the EmploymentHistoryProcessor class,
 focusing on individual method behavior and employment history processing functionality.
 """
-from packages.data_pipeline.config.config import EmploymentHistoryConfig
-from packages.data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
-from packages.data_pipeline.tests.unit.conftest import setup_mocks
+from data_pipeline.config.config import EmploymentHistoryConfig
+from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
+from data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 

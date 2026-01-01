@@ -4,8 +4,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional
 from botocore.exceptions import ClientError
 
-from packages.data_pipeline.config.config import S3Config
-from packages.data_pipeline.s3.client import S3Client
+from data_pipeline.config.config import S3Config
+from data_pipeline.s3.client import S3Client
 
 logger = logging.getLogger(__name__)
 

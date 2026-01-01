@@ -8,7 +8,7 @@
    - EKS/ECS runs container images. Each module builds to its own image.
 
 2. **Module boundaries**
-   - Shared code is allowed **only** via `packages/etl_core`.
+   - Shared code is allowed **only** via `./packages/etl_core`.
    - Avoid cross-imports between sibling modules (`file_processing`, `data_pipeline`, `observability`) unless explicitly approved.
 
 3. **No Django in `etl_core`**
@@ -49,12 +49,3 @@
    - that module
    - `etl_core` (path dependency)
    - `etl-database-schema` only if the module requires it
-
-## Migration/refactor guidance
-- Prefer mechanical changes:
-   - move files
-   - update imports
-   - update packaging configs
-   - convert Django management commands to module CLI entrypoints
-- Preserve behavior; avoid redesign.
-- Document any unavoidable behavioral changes in the module README.

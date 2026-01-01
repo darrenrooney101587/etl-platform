@@ -10,8 +10,8 @@ from unittest.mock import Mock, patch
 
 from botocore.exceptions import NoCredentialsError
 
-from packages.data_pipeline.config.config import S3Config, EmploymentHistoryConfig
-from packages.data_pipeline.s3.client import S3Client
+from data_pipeline.config.config import S3Config, EmploymentHistoryConfig
+from data_pipeline.s3.client import S3Client
 
 
 class TestBaseS3Client(unittest.TestCase):

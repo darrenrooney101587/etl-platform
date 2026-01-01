@@ -4,9 +4,9 @@ Tests for the S3FileProcessor class.
 This module contains unit tests for all methods in the S3FileProcessor class,
 focusing on individual method behavior and file processing functionality.
 """
-from packages.data_pipeline.config.config import S3Config
-from packages.data_pipeline.processors.s3_file_processor import S3FileProcessor
-from packages.data_pipeline.tests.unit.conftest import setup_mocks
+from data_pipeline.config.config import S3Config
+from data_pipeline.processors.s3_file_processor import S3FileProcessor
+from data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 

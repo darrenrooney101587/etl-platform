@@ -12,10 +12,9 @@ Maintain a Python monorepo with multiple deployable job modules and images, usin
     - `etl_core` must not import Django or `etl-database-schema`.
 
 3. **Per-module Poetry projects**
-    - Each module under `packages/<name>` has:
+    - Each module under `./packages/<name>` has:
         - `pyproject.toml`
         - `poetry.lock`
-        - `src/<name>/...`
     - Dependencies are scoped per module. Do not add heavy deps globally.
 
 4. **Root Poetry is workspace-only**
@@ -30,13 +29,7 @@ Maintain a Python monorepo with multiple deployable job modules and images, usin
 
 6. **No Django project structure inside job modules**
     - Do not create/keep `manage.py`, `settings.py`, `wsgi.py`, `urls.py`, `views.py`, `apps.py`, `management/commands` inside active module packages.
-    - Convert legacy Django management commands into CLI entrypoints under `src/<module>/cli/`.
-
-## Migration instructions: legacy Django-style repo → `packages/data_pipeline`
-- Preserve the working application behavior, but remove Django project scaffolding.
-- Keep functional code under `src/data_pipeline/` (s3/database/processors/config/support).
-- Convert `management/commands/*` into `src/data_pipeline/cli/*` and expose with Poetry console scripts.
-- Quarantine leftover Django project artifacts under `packages/data_pipeline/legacy_django/`.
+    - Convert legacy Django management commands into CLI entrypoints under `./packages/<module>/cli/`.
 
 ## Engineering expectations
 - When touching function signatures, add type hints (minimal).
