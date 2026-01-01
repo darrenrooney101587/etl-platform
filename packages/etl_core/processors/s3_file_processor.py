@@ -7,8 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional
 from botocore.exceptions import ClientError
 
-from etl_core.config.config import S3Config
-from etl_core.s3.client import S3Client
+from packages.etl_core.config import S3Config
+from packages.etl_core.s3 import S3Client
 
 logger = logging.getLogger(__name__)
 
