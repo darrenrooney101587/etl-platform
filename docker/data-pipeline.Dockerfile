@@ -23,5 +23,6 @@ WORKDIR /app/packages/data_pipeline
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --extras db
 
-# Entrypoint
-CMD ["data-pipeline-get-s3-files", "--help"]
+# Entrypoint: expose the installed console script (stable for EKS Jobs)
+ENTRYPOINT ["data-pipeline"]
+CMD ["--help"]

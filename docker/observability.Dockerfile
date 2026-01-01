@@ -16,5 +16,6 @@ WORKDIR /app/packages/observability
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi
 
-# Placeholder entrypoint
-CMD ["echo", "Observability Module Started"]
+# Entrypoint: expose observability CLI
+ENTRYPOINT ["etl-observe"]
+CMD ["--help"]

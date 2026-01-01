@@ -1,19 +1,19 @@
 FROM python:3.10-slim
-CMD ["echo", "File Processing Module Started"]
-# Placeholder entrypoint
 
-    && poetry install --no-interaction --no-ansi
-RUN poetry config virtualenvs.create false \
-WORKDIR /app/packages/file_processing
-# Install dependencies
-
-COPY packages/file_processing /app/packages/file_processing
-# Copy file_processing
-
-COPY packages/etl_core /app/packages/etl_core
-# Copy etl_core
+# Install poetry and set up working dir
+WORKDIR /app
 
 RUN pip install poetry
-# Install poetry
 
-WORKDIR /app
+# Copy etl_core and file_processing
+COPY packages/etl_core /app/packages/etl_core
+COPY packages/file_processing /app/packages/file_processing
+
+# Install dependencies for file_processing
+WORKDIR /app/packages/file_processing
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi
+
+# Entrypoint: use console script if provided
+ENTRYPOINT ["file-processing"]
+CMD ["--help"]

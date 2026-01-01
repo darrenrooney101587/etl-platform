@@ -18,6 +18,9 @@ etl-database-schema = {git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-data
 [tool.poetry.extras]
 db = ["etl-database-schema", "django"]
 
+[tool.poetry.scripts]
+etl-observe = "observability.cli:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

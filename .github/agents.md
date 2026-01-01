@@ -1,7 +1,39 @@
-# Agents.md — `etl-platform` Monorepo Guidance
+# agents.md
+
+# Agent Behavioral Guidelines
 
 ## Purpose
-`etl-platform` is a **Python monorepo** containing multiple independently deployable ETL job modules. Each deployable module builds into its own Docker image and is deployed as batch jobs (EKS/ECS/EMR). This repo is **not** a Django monolith and **not** a web service.
+
+This file defines **behavioral rules and decision-making logic** for autonomous agents. These rules control:
+
+- How agents select their mode/role
+- What agents must enforce when generating code
+- When agents should fetch data, create tests, or refactor
+- `etl-platform` is a **Python monorepo** containing multiple independently deployable ETL job modules. Each deployable module builds into its own Docker image and is deployed as batch jobs (EKS/ECS/EMR). This repo is **not** a Django monolith and **not** a web service.
+
+## Scope
+
+- **What's here:** Agent roles, mode selection, enforcement checklists, behavioral guidelines
+- **What's NOT here:** Coding standards and patterns (see `copilot-instructions.md` for code style rules)
+
+## Relationship to copilot-instructions.md
+
+- Agents **reference** `copilot-instructions.md` for coding standards
+- Agents **follow** `agents.md` for behavioral decisions and enforcement
+- Together these files ensure consistent, high-quality code generation.
+
+---
+
+# Global Agent Rules
+
+These rules apply to all agents.
+
+- Keep responses concise and actionable.
+- Output full runnable files unless diffs are requested.
+- Follow all coding, testing, and documentation standards defined in `copilot-instructions.md`.
+- Never hallucinate directories, imports, APIs, commands, or file names.
+- Ask for clarification only when necessary to avoid incorrect output.
+- Automatically select the correct agent role based on file path, file type, or user intent.
 
 ## Non-negotiable rules
 1. **Deploy images, not repos**
@@ -40,7 +72,6 @@
 
 ## Packaging expectations
 - Each module is a separate Poetry project under `packages/<module>/`.
-- Each module uses `src/` layout.
 - Each module maintains its own `poetry.lock` for reproducible builds.
 
 ## Containerization expectations

@@ -10,6 +10,9 @@ packages = [{include = "file_processing", from = "src"}]
 python = "^3.10"
 etl-core = {path = "../etl_core", develop = false}
 
+[tool.poetry.scripts]
+file-processing = "file_processing.cli:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

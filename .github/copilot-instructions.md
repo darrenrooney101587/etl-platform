@@ -1,14 +1,68 @@
 # Copilot Instructions — `etl-platform`
+# Copilot Coding Instructions
 
-## Goal
-Maintain a Python monorepo with multiple deployable job modules and images, using Poetry and strict dependency boundaries.
+## Purpose
+
+This file defines **coding standards and patterns** for the repository. These rules apply to:
+
+- General AI chat interactions
+- Agent-based code generation
+- Human developers writing code
+
+---
+
+These instructions define the **coding standards** for this repository.
+All generated code must follow these rules.
+Behavioral logic (how agents respond and make decisions) is defined in `agents.md`.
+
+---
+
+
+# 1. General Standards
+
+- Keep output concise and focused on the requested task.
+- No emojis in code, comments, logs, or documentation.
+- Comments should explain non-obvious logic only.
+- Never hallucinate folders, file names, functions, models, components, or imports.
+- All imports must be at the top of each file.
+
+# 2. Python / Django Standards
+
+## 2.1 Core Rules
+
+- Python version: **3.10**
+- Follow **PEP‑8** for style and formatting.
+- Use **PEP‑287** docstrings for all modules, classes, methods, and functions.
+- Use **complete type annotations** everywhere.
+- Use **exceptions**, not return codes, for error handling.
+- Prefer **class-based design** for application logic.
+
+## 2.2 Imports
+
+Order imports in three groups:
+
+1. Standard library
+2. Third-party
+3. Local modules
+   Each group must be alphabetized.
+
+## 2.3 Dependency Injection
+
+All classes that talk to external resources (AWS, HTTP clients, DB connectors, registries, etc.) must:
+
+- Accept dependencies via constructor injection.
+- Default to production implementations.
+- Allow test injection for mocking.
+
+## 2.4 Testing
+
+- Use **unittest.TestCase** for all tests.
+- Include a `if __name__ == "__main__": unittest.main()` block.
+- Use DI to mock all external resources.
+- Each Django app stores tests in its own `tests/` directory.
 
 ## Hard rules
-1. **Do not redesign business logic**
-    - Prefer mechanical refactors: file moves, import updates, configuration wiring.
-    - If behavior must change for packaging/runtime, document it.
-
-2. **Keep Django out of `etl_core`**
+1.  **Keep Django out of `etl_core`**
     - `etl_core` must not import Django or `etl-database-schema`.
 
 3. **Per-module Poetry projects**
@@ -24,7 +78,6 @@ Maintain a Python monorepo with multiple deployable job modules and images, usin
 
 5. **`etl-database-schema` dependency model**
     - Treat `etl-database-schema` as an external package (Git URL or internal index).
-    - Only `data_pipeline` and `observability` should depend on it by default.
     - Prefer making it an optional dependency group inside the module.
 
 6. **No Django project structure inside job modules**
