@@ -1,0 +1,34 @@
+"""Factory helpers for etl_core to construct generic components."""
+from __future__ import annotations
+
+import os
+from typing import Optional
+
+from etl_core.config.config import S3Config
+from etl_core.processors.s3_file_processor import S3FileProcessor
+
+
+def create_s3_processor(
+    source_bucket: str,
+    destination_bucket: str,
+    agency_s3_slug: str,
+    agency_id: Optional[int] = None,
+    destination_prefix: str = "/downloads/",
+    max_workers: int = 5,
+    retry_attempts: int = 3,
+) -> S3FileProcessor:
+    """Create an S3FileProcessor configured from provided parameters and environment."""
+    config = S3Config(
+        source_bucket=source_bucket,
+        agency_s3_slug=agency_s3_slug,
+        agency_id=agency_id,
+        destination_bucket=destination_bucket,
+        destination_prefix=destination_prefix,
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        aws_region=os.getenv("AWS_DEFAULT_REGION", "us-gov-west-1"),
+        max_workers=max_workers,
+        retry_attempts=retry_attempts,
+    )
+
+    return S3FileProcessor(config)

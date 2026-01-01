@@ -1,11 +1,11 @@
+"""Environment-to-field mapping helpers for etl_core."""
+from __future__ import annotations
+
 import os
 
-def get_env_s3_field() -> str:
-    """Return the S3 slug field name for the current environment.
 
-    :returns: Column name used to select S3 slug in reporting.ref_agency_designations
-    :rtype: str
-    """
+def get_env_s3_field() -> str:
+    """Return the S3 slug field name for the current environment."""
     env = os.getenv("ENVIRONMENT", "qa")
     env_map = {
         "production": "prod_s3_slug",
@@ -16,12 +16,9 @@ def get_env_s3_field() -> str:
     }
     return env_map.get(env, "qa_s3_slug")
 
-def get_env_bms_id_field() -> str:
-    """Return the BMS ID field name for the current environment.
 
-    :returns: Field name used to match agency id in reporting.ref_agency_designations
-    :rtype: str
-    """
+def get_env_bms_id_field() -> str:
+    """Return the BMS ID field name for the current environment."""
     env = os.getenv("ENVIRONMENT", "qa")
     id_map = {
         "production": "prod_bms_id",
