@@ -11,7 +11,7 @@ import sys
 import traceback
 from typing import Any, Dict, List, Optional
 
-from data_pipeline.service_handler import ServiceHandler
+from packages.data_pipeline.service_handler import ServiceHandler
 
 
 def _print_results(result: Dict[str, Any]) -> None:

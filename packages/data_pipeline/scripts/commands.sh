@@ -7,12 +7,10 @@
 # CLI Commands
 # -----------------------------
 
-# Dry run (analyze only, no file operations) - Note: dry-run logic needs to be implemented in CLI if supported
-# Currently the CLI does not expose a --dry-run flag explicitly in the argparse definition I created,
-# but the ServiceHandler supports it. I should probably add it to the CLI.
-# For now, I will list the commands that are supported.
+# Dry run (analyze only, no file operations)
+# The ServiceHandler supports dry_run; we show how to invoke it below from the container.
 
-# Real run (process files and employment history)
+# Real run (process files and employment history) using the installed console script
 poetry run data-pipeline-get-s3-files --agency-id 10
 
 # With custom buckets
@@ -22,62 +20,90 @@ poetry run data-pipeline-get-s3-files \
   --destination-bucket my-destination-bucket
 
 
-# Process endpoint (dry run via process API)
-curl -X POST http://localhost:5090/api/s3/process/ \
-  -H "Content-Type: application/json" \
-  -d '{"agency_id": 10, "dry_run": true}'
-
-# Process with custom buckets (real run)
-curl -X POST http://localhost:5090/api/s3/process/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agency_id": 42,
-    "dry_run": True,
-    "source_bucket": "my-source-bucket",
-    "destination_bucket": "my-destination-bucket"
-  }'
-
-# Process with custom buckets (dry run)
-curl -X POST http://localhost:5090/api/s3/process/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agency_id": 42,
-    "dry_run": true,
-    "source_bucket": "my-source-bucket",
-    "destination_bucket": "my-destination-bucket"
-  }'
-
 # -----------------------------
-# With Basic Auth (if enabled)
+# Docker: run the CLI inside a container image (production / baked image)
 # -----------------------------
 
-# Set auth variables first:
-# export AUTH_USER="your-username"
-# export AUTH_PASS="your-password"
-# AUTH_HEADER=$(printf "%s:%s" "$AUTH_USER" "$AUTH_PASS" | base64)
+# Production image: run the installed console script (image must include the console script)
+# Preferred: if the image sets the console script as ENTRYPOINT (recommended for EKS Jobs),
+# pass only the CLI arguments to the container. This keeps the job invocation stable for K8s.
+# Example (preferred):
+docker run --rm etl-data-pipeline \
+  --agency-id 10 \
+  --source-bucket benchmarkanalytics-production-env-userdocument-test \
+  --destination-bucket etl-ba-research-client-etl
 
-# Analyze with auth
-# curl -X POST http://localhost:5090/api/s3/analyze/ \
-#   -H "Content-Type: application/json" \
-#   -H "Authorization: Basic $AUTH_HEADER" \
-#   -d '{"agency_id": 10}'
+# Fallback: if the image does NOT set the console script as ENTRYPOINT, invoke it explicitly:
+# (this will run the console script as the container command)
+# Example (fallback):
+docker run --rm etl-data-pipeline \
+  data-pipeline-get-s3-files --agency-id 10 \
+  --source-bucket benchmarkanalytics-production-env-userdocument-test \
+  --destination-bucket etl-ba-research-client-etl
 
-# Process with auth
-# curl -X POST http://localhost:5090/api/s3/process/ \
-#   -H "Content-Type: application/json" \
-#   -H "Authorization: Basic $AUTH_HEADER" \
-#   -d '{"agency_id": 10, "dry_run": false}'
+# Production: with custom buckets (preferred ENTRYPOINT form)
+docker run --rm etl-data-pipeline \
+  --agency-id 42 \
+  --source-bucket my-source-bucket \
+  --destination-bucket my-destination-bucket
+
+# Production: with custom buckets (fallback explicit invocation)
+docker run --rm etl-data-pipeline \
+  data-pipeline-get-s3-files --agency-id 42 \
+  --source-bucket my-source-bucket \
+  --destination-bucket my-destination-bucket
+
 
 # -----------------------------
-# Pretty-print JSON responses
+# Docker: dev container (mount local source, auto-install deps via entrypoint)
 # -----------------------------
 
-# Analyze with jq formatting
-curl -sS -X POST http://localhost:5090/api/s3/analyze/ \
-  -H "Content-Type: application/json" \
-  -d '{"agency_id": 10}' | jq .
+# Use the dev entrypoint so the container will install dependencies when the
+# source is mounted into the container at runtime.
+# Replace SKIP_INSTALL=1 to avoid installs when you know the image is already built.
 
-# Process with jq formatting
-curl -sS -X POST http://localhost:5090/api/s3/process/ \
-  -H "Content-Type: application/json" \
-  -d '{"agency_id": 10, "dry_run": true}' | jq .
+docker run --rm -it \
+  -v "$(pwd)/packages/data_pipeline:/app/packages/data_pipeline" \
+  -v "$(pwd)/packages/etl_core:/app/packages/etl_core" \
+  --workdir /app/packages/data_pipeline \
+  -e SKIP_INSTALL= \
+  --entrypoint /app/packages/data_pipeline/config_scripts/docker-entrypoint.sh \
+  etl-data-pipeline \
+  poetry run data-pipeline-get-s3-files --agency-id 10 \
+    --source-bucket benchmarkanalytics-production-env-userdocument-test \
+    --destination-bucket etl-ba-research-client-etl
+
+
+# -----------------------------
+# Docker: analyze (dry run) examples
+# -----------------------------
+
+# Production image: call ServiceHandler.analyze_agency_data inside the image and print JSON
+docker run --rm etl-data-pipeline \
+  python - <<'PY'
+import json
+from data_pipeline.service_handler import ServiceHandler
+s = ServiceHandler(source_bucket="benchmarkanalytics-production-env-userdocument-test", destination_bucket="etl-ba-research-client-etl")
+print(json.dumps(s.analyze_agency_data(10, dry_run=True)))
+PY
+
+# Dev container: mount source and run analyze via the dev entrypoint (auto installs if needed)
+docker run --rm -it \
+  -v "$(pwd)/packages/data_pipeline:/app/packages/data_pipeline" \
+  -v "$(pwd)/packages/etl_core:/app/packages/etl_core" \
+  --workdir /app/packages/data_pipeline \
+  --entrypoint /app/packages/data_pipeline/config_scripts/docker-entrypoint.sh \
+  etl-data-pipeline \
+  poetry run python - <<'PY'
+import json
+from data_pipeline.service_handler import ServiceHandler
+s = ServiceHandler(source_bucket="benchmarkanalytics-production-env-userdocument-test", destination_bucket="etl-ba-research-client-etl")
+print(json.dumps(s.analyze_agency_data(10, dry_run=True)))
+PY
+
+
+# -----------------------------
+# Docker: run module directly (falls back to python -m when console script not present)
+# -----------------------------
+
+docker run --rm etl-data-pipeline python -m data_pipeline.cli.get_s3_files --agency-id 10
