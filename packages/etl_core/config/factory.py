@@ -4,8 +4,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from etl_core.config.config import S3Config
-from etl_core.processors.s3_file_processor import S3FileProcessor
+from packages.data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
+from packages.etl_core.config import S3Config
+from packages.etl_core.config.config import EmploymentHistoryConfig
+from packages.etl_core.processors.s3_file_processor import S3FileProcessor
 
 
 def create_s3_processor(
@@ -32,3 +34,34 @@ def create_s3_processor(
     )
 
     return S3FileProcessor(config)
+
+def create_employment_history_processor(
+        agency_id: int,
+        destination_bucket: str,
+        agency_s3_slug: str,
+        destination_prefix: str = "/downloads/",
+) -> EmploymentHistoryProcessor:
+    """Create an EmploymentHistoryProcessor with configuration.
+
+    :param agency_id: Agency ID for database queries.
+    :type agency_id: int
+    :param destination_bucket: Destination S3 bucket name.
+    :type destination_bucket: str
+    :param agency_s3_slug: Agency slug for S3 key construction.
+    :type agency_s3_slug: str
+    :param destination_prefix: Prefix for destination S3 keys.
+    :type destination_prefix: str
+    :returns: Configured EmploymentHistoryProcessor instance.
+    :rtype: EmploymentHistoryProcessor
+    """
+    config = EmploymentHistoryConfig(
+        agency_id=agency_id,
+        destination_bucket=destination_bucket,
+        agency_s3_slug=agency_s3_slug,
+        destination_prefix=destination_prefix,
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        aws_region=os.getenv("AWS_DEFAULT_REGION", "us-gov-west-1"),
+    )
+
+    return EmploymentHistoryProcessor(config)

@@ -1,5 +1,5 @@
 """
-Service layer for S3 file processing operations.
+Job logic for processing Agency Data (S3 files and Employment History).
 
 This module encapsulates the business logic for processing S3 files and employment
 history data, making it reusable across different interfaces (management commands, API endpoints).
@@ -7,13 +7,15 @@ history data, making it reusable across different interfaces (management command
 import logging
 from typing import Any, Dict, Optional
 
-from data_pipeline.config.factory import create_employment_history_processor, create_s3_processor
-from data_pipeline.database.client import DatabaseClient
+from etl_core.database.client import DatabaseClient
+from etl_core.config.config import S3Config, EmploymentHistoryConfig
+from data_pipeline.shared.s3_adapter import get_configured_processor, upload_attachment_manifest
+from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
 
 logger = logging.getLogger(__name__)
 
-class ServiceHandler:
-    """Service class that handles S3 file processing operations."""
+class AgencyDataJob:
+    """Job class that handles S3 file processing operations for an agency."""
 
     def __init__(self,
                  source_bucket: str,
@@ -24,10 +26,6 @@ class ServiceHandler:
         :type source_bucket: str
         :param destination_bucket: Destination S3 bucket name
         :type destination_bucket: str
-        :param progress_callback: Optional progress callback function
-        :type progress_callback: Optional[Callable]
-        :param db_client: Optional database client to inject for testability
-        :type db_client: Optional[DatabaseClient]
         """
         self.source_bucket = source_bucket
         self.destination_bucket = destination_bucket
@@ -57,9 +55,8 @@ class ServiceHandler:
             # Analyze employment history (read-only)
             employment_count = 0
             try:
-                employment_processor = create_employment_history_processor(
+                employment_processor = self._create_employment_history_processor(
                     agency_id=agency_id,
-                    destination_bucket=self.destination_bucket,
                     agency_s3_slug=agency_s3_slug,
                     destination_prefix='/downloads/'
                 )
@@ -122,11 +119,9 @@ class ServiceHandler:
                     }
 
                 # Create processor
-                processor = create_s3_processor(
-                    source_bucket=self.source_bucket,
-                    destination_bucket=self.destination_bucket,
-                    agency_s3_slug=agency_s3_slug,
+                processor = self._create_s3_processor(
                     agency_id=agency_id,
+                    agency_s3_slug=agency_s3_slug,
                     destination_prefix='/downloads/'
                 )
 
@@ -137,7 +132,7 @@ class ServiceHandler:
                 )
 
                 # Upload metadata CSV
-                csv_result = processor.upload_metadata_csv(db_results)
+                csv_result = upload_attachment_manifest(processor, db_results)
 
                 # Process employment history
                 employment_result = self._process_employment_history(
@@ -165,9 +160,8 @@ class ServiceHandler:
                 # Dry run: Compute planned steps without performing external actions
                 files_planned = len(db_results)
                 try:
-                    employment_processor = create_employment_history_processor(
+                    employment_processor = self._create_employment_history_processor(
                         agency_id=agency_id,
-                        destination_bucket=self.destination_bucket,
                         agency_s3_slug=agency_s3_slug,
                         destination_prefix='/downloads/'
                     )
@@ -209,9 +203,8 @@ class ServiceHandler:
         :rtype: Dict[str, Any]
         """
         try:
-            employment_processor = create_employment_history_processor(
+            employment_processor = self._create_employment_history_processor(
                 agency_id=agency_id,
-                destination_bucket=self.destination_bucket,
                 agency_s3_slug=agency_s3_slug,
                 destination_prefix='/downloads/'
             )
@@ -235,3 +228,23 @@ class ServiceHandler:
                 'message': f'Error processing employment history: {str(e)}',
                 'records_count': 0
             }
+
+    def _create_s3_processor(self, agency_id: int, agency_s3_slug: str, destination_prefix: str):
+        config = S3Config(
+            source_bucket=self.source_bucket,
+            destination_bucket=self.destination_bucket,
+            agency_s3_slug=agency_s3_slug,
+            agency_id=agency_id,
+            destination_prefix=destination_prefix
+        )
+        # Use the adapter to get a configured processor
+        return get_configured_processor(config, agency_id=str(agency_id))
+
+    def _create_employment_history_processor(self, agency_id: int, agency_s3_slug: str, destination_prefix: str):
+        config = EmploymentHistoryConfig(
+            agency_id=agency_id,
+            destination_bucket=self.destination_bucket,
+            agency_s3_slug=agency_s3_slug,
+            destination_prefix=destination_prefix
+        )
+        return EmploymentHistoryProcessor(config)

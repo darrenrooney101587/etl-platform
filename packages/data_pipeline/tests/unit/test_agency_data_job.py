@@ -1,30 +1,26 @@
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock, patch
+import unittest
 
-
-from data_pipeline.service_handler import ServiceHandler
+from data_pipeline.jobs.agency_data_job import AgencyDataJob
 from data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 
-import unittest
-from unittest.mock import MagicMock, Mock, patch
-
-
-class TestServiceHandler(unittest.TestCase):
-    """Unit tests for ServiceHandler dry_run behavior."""
+class TestAgencyDataJob(unittest.TestCase):
+    """Unit tests for AgencyDataJob dry_run behavior."""
 
     def setUp(self) -> None:
-        self.service = ServiceHandler(
+        self.service = AgencyDataJob(
             source_bucket="src-bucket",
             destination_bucket="dst-bucket",
         )
 
-    @patch("data_pipeline.database.client.DatabaseClient.get_organization_employment_history", return_value=[1, 2, 3])
-    @patch("data_pipeline.service_handler.create_s3_processor")
-    @patch("data_pipeline.service_handler.create_employment_history_processor")
-    @patch("data_pipeline.database.client.DatabaseClient.get_agency_s3_slug")
-    @patch("data_pipeline.database.client.DatabaseClient.get_attachment_files_for_s3_processing")
+    @patch("etl_core.database.client.DatabaseClient.get_organization_employment_history", return_value=[1, 2, 3])
+    @patch.object(AgencyDataJob, "_create_s3_processor")
+    @patch.object(AgencyDataJob, "_create_employment_history_processor")
+    @patch("etl_core.database.client.DatabaseClient.get_agency_s3_slug")
+    @patch("etl_core.database.client.DatabaseClient.get_attachment_files_for_s3_processing")
     def test_process_agency_files_dry_run_no_external_calls(
         self,
         mock_get_files: MagicMock,
@@ -56,11 +52,11 @@ class TestServiceHandler(unittest.TestCase):
         self.assertEqual(result["results"]["employment_records"], 3)
         self.assertEqual(result["results"]["files_processed"], 0)
 
-    @patch("data_pipeline.database.client.DatabaseClient.get_organization_employment_history", return_value=[1, 2, 3])
-    @patch("data_pipeline.service_handler.ServiceHandler._process_employment_history")
-    @patch("data_pipeline.service_handler.create_s3_processor")
-    @patch("data_pipeline.database.client.DatabaseClient.get_agency_s3_slug")
-    @patch("data_pipeline.database.client.DatabaseClient.get_attachment_files_for_s3_processing")
+    @patch("etl_core.database.client.DatabaseClient.get_organization_employment_history", return_value=[1, 2, 3])
+    @patch.object(AgencyDataJob, "_process_employment_history")
+    @patch.object(AgencyDataJob, "_create_s3_processor")
+    @patch("etl_core.database.client.DatabaseClient.get_agency_s3_slug")
+    @patch("etl_core.database.client.DatabaseClient.get_attachment_files_for_s3_processing")
     def test_process_agency_files_executes_when_not_dry_run(
         self,
         mock_get_files: MagicMock,
@@ -98,8 +94,3 @@ class TestServiceHandler(unittest.TestCase):
         self.assertEqual(result["results"]["files_processed"], 2)
         self.assertEqual(result["results"]["files_successful"], 1)
         self.assertEqual(result["results"]["files_failed"], 1)
-
-
-if __name__ == "__main__":
-    import unittest
-    unittest.main()

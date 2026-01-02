@@ -11,11 +11,11 @@ import sys
 import traceback
 from typing import Any, Dict, List, Optional
 
-from packages.data_pipeline.service_handler import ServiceHandler
+from data_pipeline.jobs.agency_data_job import AgencyDataJob
 
 
 def _print_results(result: Dict[str, Any]) -> None:
-    """Print the results returned by ServiceHandler in a human-friendly format."""
+    """Print the results returned by AgencyDataJob in a human-friendly format."""
     if result.get("status") in ("error", "warning"):
         print(f"{result.get('status').upper()}: {result.get('message')}")
         return
@@ -79,7 +79,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        service = ServiceHandler(source_bucket=args.source_bucket, destination_bucket=args.destination_bucket)
+        service = AgencyDataJob(source_bucket=args.source_bucket, destination_bucket=args.destination_bucket)
         result = service.process_agency_files(args.agency_id)
         _print_results(result)
 
