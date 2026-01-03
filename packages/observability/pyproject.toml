@@ -4,16 +4,16 @@ version = "0.1.0"
 description = "Platform monitoring and health signals"
 authors = ["Admin <admin@example.com>"]
 readme = "README.md"
-packages = [{include = "observability", from = "src"}]
+packages = [{ include = "observability", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-etl-core = {path = "../etl_core", develop = false}
-django = {version = "^4.2", optional = true}
+etl-core = { path = "../etl_core", develop = false }
+django = { version = "^4.2", optional = true }
 # Local development
 # etl-database-schema = {path = "../../../../benchmark/repositories/etl-database-schema", develop = true, optional = true}
 # Production / CI
-etl-database-schema = {git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git", rev = "v0.3.3", optional = true}
+etl-database-schema = { git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git", rev = "v0.3.3", optional = true }
 
 [tool.poetry.extras]
 db = ["etl-database-schema", "django"]

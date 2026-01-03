@@ -22,6 +22,7 @@ class S3Config:
     max_workers: int = 5
     retry_attempts: int = 3
 
+
 @dataclass
 class EmploymentHistoryConfig:
     """Configuration for employment history operations.

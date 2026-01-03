@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class JobDefinition(NamedTuple):
     entrypoint: Callable[[List[str]], int]
     description: str
@@ -52,10 +53,12 @@ def _discover_jobs() -> Dict[str, JobDefinition]:
             if isinstance(candidate, JobDefinition):
                 entries[name] = candidate
             # Accept a lightweight tuple form (callable, description) to avoid circular imports in job modules
-            elif isinstance(candidate, (list, tuple)) and len(candidate) == 2 and callable(candidate[0]) and isinstance(candidate[1], str):
+            elif isinstance(candidate, (list, tuple)) and len(candidate) == 2 and callable(candidate[0]) and isinstance(
+                    candidate[1], str):
                 entries[name] = JobDefinition(entrypoint=candidate[0], description=candidate[1])
             else:
-                logger.warning("JOB in %s is not a JobDefinition or tuple(entrypoint, description); ignoring", full_name)
+                logger.warning("JOB in %s is not a JobDefinition or tuple(entrypoint, description); ignoring",
+                               full_name)
         else:
             logger.warning("Job module %s does not expose JOB; ignoring (migrate to JOB variable)", full_name)
 

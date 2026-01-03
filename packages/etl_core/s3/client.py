@@ -86,8 +86,8 @@ class S3Client:
             return {'status': 'error', 'message': f'Error uploading CSV: {str(e)}'}
 
     def upload_data_as_csv(self, data: List[Dict[str, Any]], fieldnames: List[str],
-                          filename_prefix: str, subfolder: str = "",
-                          record_count_key: Optional[str] = None) -> Dict[str, Any]:
+                           filename_prefix: str, subfolder: str = "",
+                           record_count_key: Optional[str] = None) -> Dict[str, Any]:
         try:
             if not data:
                 return {

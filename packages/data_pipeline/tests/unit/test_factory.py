@@ -8,6 +8,7 @@ setup_mocks()
 
 import unittest
 
+
 class TestFactory(unittest.TestCase):
     def test_create_s3_processor(self):
         processor = create_s3_processor(
@@ -33,6 +34,8 @@ class TestFactory(unittest.TestCase):
         self.assertEqual(processor.config.destination_bucket, "dest")
         self.assertEqual(processor.config.agency_s3_slug, "slug")
 
+
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

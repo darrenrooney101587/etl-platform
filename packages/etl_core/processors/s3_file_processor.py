@@ -25,13 +25,13 @@ class S3FileProcessor(S3Client):
     """
 
     def __init__(
-        self,
-        config: S3Config,
-        s3_client: Optional[Any] = None,
-        *,
-        mapping_keys: Optional[Dict[str, str]] = None,
-        agency_prefix_fn: Optional[Callable[[], str]] = None,
-        destination_key_fn: Optional[Callable[[str, str], str]] = None,
+            self,
+            config: S3Config,
+            s3_client: Optional[Any] = None,
+            *,
+            mapping_keys: Optional[Dict[str, str]] = None,
+            agency_prefix_fn: Optional[Callable[[], str]] = None,
+            destination_key_fn: Optional[Callable[[str, str], str]] = None,
     ) -> None:
         """Initialize the processor.
 
@@ -221,23 +221,23 @@ class S3FileProcessor(S3Client):
                 }
 
     def upload_metadata_csv(
-        self,
-        query_results: List[Dict[str, Any]],
+            self,
+            query_results: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
-         """Upload metadata CSV to S3.
+        """Upload metadata CSV to S3.
 
-         This method is intentionally generic: callers provide filename_prefix,
-         subfolder and record_count_key as they see fit for their job.
-         """
-         if not query_results:
-             return {"status": "error", "message": "No query results to upload"}
+        This method is intentionally generic: callers provide filename_prefix,
+        subfolder and record_count_key as they see fit for their job.
+        """
+        if not query_results:
+            return {"status": "error", "message": "No query results to upload"}
 
-         fieldnames = list(query_results[0].keys())
-         # Use canonical metadata naming convention for attachment manifests
-         return self.upload_data_as_csv(
-             data=query_results,
-             fieldnames=fieldnames,
-             filename_prefix="metadata",
-             subfolder="attachment_manifest",
-             record_count_key="records_count",
-         )
+        fieldnames = list(query_results[0].keys())
+        # Use canonical metadata naming convention for attachment manifests
+        return self.upload_data_as_csv(
+            data=query_results,
+            fieldnames=fieldnames,
+            filename_prefix="metadata",
+            subfolder="attachment_manifest",
+            record_count_key="records_count",
+        )

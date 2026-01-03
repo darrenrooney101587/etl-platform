@@ -213,7 +213,8 @@ class TestS3FileProcessor(unittest.TestCase):
         processor = S3FileProcessor(self.sample_s3_config, self.mock_s3_client)
 
         error_response = {"Error": {"Code": "InternalError", "Message": "Server error"}}
-        self.mock_s3_client.head_object.side_effect = [ClientError(error_response, "HeadObject"), {"ContentLength": 1024}]
+        self.mock_s3_client.head_object.side_effect = [ClientError(error_response, "HeadObject"),
+                                                       {"ContentLength": 1024}]
 
         mapping = {"filename": "test_file.pdf", "output_filename": "renamed_file.pdf"}
 
@@ -303,4 +304,5 @@ class TestS3FileProcessor(unittest.TestCase):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

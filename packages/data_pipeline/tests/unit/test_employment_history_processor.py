@@ -13,6 +13,7 @@ setup_mocks()
 import unittest
 from unittest.mock import Mock, patch
 
+
 class TestEmploymentHistoryProcessor(unittest.TestCase):
     """Test cases for EmploymentHistoryProcessor class methods.
 
@@ -237,4 +238,5 @@ class TestEmploymentHistoryProcessor(unittest.TestCase):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

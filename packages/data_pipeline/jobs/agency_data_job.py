@@ -229,7 +229,7 @@ class AgencyDataJob:
                         'files_successful': len(successful_files),
                         'files_failed': len(failed_files),
                         'failed_files': [{'source_key': f['source_key'], 'message': f['message']}
-                                       for f in failed_files],
+                                         for f in failed_files],
                         'csv_upload': csv_result,
                         'employment_history': employment_result
                     }

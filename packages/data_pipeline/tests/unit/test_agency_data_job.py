@@ -7,6 +7,7 @@ from data_pipeline.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 
+
 class TestAgencyDataJob(unittest.TestCase):
     """Unit tests for AgencyDataJob dry_run behavior."""
 
@@ -22,12 +23,12 @@ class TestAgencyDataJob(unittest.TestCase):
     @patch("etl_core.database.client.DatabaseClient.get_agency_s3_slug")
     @patch("etl_core.database.client.DatabaseClient.get_attachment_files_for_s3_processing")
     def test_process_agency_files_dry_run_no_external_calls(
-        self,
-        mock_get_files: MagicMock,
-        mock_get_slug: MagicMock,
-        mock_create_eh: MagicMock,
-        mock_create_s3: MagicMock,
-        mock_get_organization_employment_history: MagicMock,
+            self,
+            mock_get_files: MagicMock,
+            mock_get_slug: MagicMock,
+            mock_create_eh: MagicMock,
+            mock_create_s3: MagicMock,
+            mock_get_organization_employment_history: MagicMock,
     ) -> None:
         """When dry_run is True, do not instantiate S3 processor or upload anything."""
         mock_get_files.return_value = [
@@ -58,12 +59,12 @@ class TestAgencyDataJob(unittest.TestCase):
     @patch("etl_core.database.client.DatabaseClient.get_agency_s3_slug")
     @patch("etl_core.database.client.DatabaseClient.get_attachment_files_for_s3_processing")
     def test_process_agency_files_executes_when_not_dry_run(
-        self,
-        mock_get_files: MagicMock,
-        mock_get_slug: MagicMock,
-        mock_create_s3: MagicMock,
-        mock_proc_eh: MagicMock,
-        mock_get_organization_employment_history: MagicMock,
+            self,
+            mock_get_files: MagicMock,
+            mock_get_slug: MagicMock,
+            mock_create_s3: MagicMock,
+            mock_proc_eh: MagicMock,
+            mock_get_organization_employment_history: MagicMock,
     ) -> None:
         """When dry_run is False, processing path is executed and results aggregated."""
         mock_get_files.return_value = [

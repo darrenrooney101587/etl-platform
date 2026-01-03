@@ -51,10 +51,10 @@ def make_destination_key_fn(destination_prefix: str) -> Callable[[str, str], str
 
 
 def get_configured_processor(
-    config: S3Config,
-    *,
-    agency_id: Optional[str] = None,
-    mapping_keys: Optional[Dict[str, str]] = None,
+        config: S3Config,
+        *,
+        agency_id: Optional[str] = None,
+        mapping_keys: Optional[Dict[str, str]] = None,
 ) -> S3FileProcessor:
     """Return an S3FileProcessor configured for the data_pipeline job.
 

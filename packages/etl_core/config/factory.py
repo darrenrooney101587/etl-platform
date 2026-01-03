@@ -11,13 +11,13 @@ from packages.etl_core.processors.s3_file_processor import S3FileProcessor
 
 
 def create_s3_processor(
-    source_bucket: str,
-    destination_bucket: str,
-    agency_s3_slug: str,
-    agency_id: Optional[int] = None,
-    destination_prefix: str = "/downloads/",
-    max_workers: int = 5,
-    retry_attempts: int = 3,
+        source_bucket: str,
+        destination_bucket: str,
+        agency_s3_slug: str,
+        agency_id: Optional[int] = None,
+        destination_prefix: str = "/downloads/",
+        max_workers: int = 5,
+        retry_attempts: int = 3,
 ) -> S3FileProcessor:
     """Create an S3FileProcessor configured from provided parameters and environment."""
     config = S3Config(
@@ -34,6 +34,7 @@ def create_s3_processor(
     )
 
     return S3FileProcessor(config)
+
 
 def create_employment_history_processor(
         agency_id: int,
