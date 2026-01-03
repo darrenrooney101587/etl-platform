@@ -54,6 +54,14 @@ All classes that talk to external resources (AWS, HTTP clients, DB connectors, r
 - Default to production implementations.
 - Allow test injection for mocking.
 
+
+## 2.5 Database separation rule
+
+- `etl_core` must not contain domain-specific SQL queries or Django ORM models. It may provide a minimal, DI-friendly DB client (for example `DatabaseClient.execute_query`) that exposes a simple query execution surface returning dict rows.
+- All business-domain SQL (reports, extracts, ETL-specific SELECTs) must live in package-level repositories (for example `packages/data_pipeline/repositories`), not in `etl_core`.
+- Repositories should accept a `DatabaseClient` via constructor injection and expose named methods (e.g. `get_attachment_files_for_s3_processing`) that return typed results.
+- If a query becomes broadly useful across modules or should be kept as canonical domain logic, promote it to `etl-database-schema` or another shared schema package.
+
 ## 2.4 Testing
 
 - Use **unittest.TestCase** for all tests.

@@ -8,12 +8,13 @@ import argparse
 import logging
 import sys
 import traceback
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from etl_core.database.client import DatabaseClient
 from etl_core.config.config import EmploymentHistoryConfig, S3Config
 from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
 from data_pipeline.shared.s3_adapter import get_configured_processor, upload_attachment_manifest
+from data_pipeline.repositories.attachment_repository import AttachmentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -92,17 +93,21 @@ class AgencyDataJob:
 
     def __init__(self,
                  source_bucket: str,
-                 destination_bucket: str):
+                 destination_bucket: str,
+                 db_client: Optional[DatabaseClient] = None):
         """Initialize the S3 processing service.
 
         :param source_bucket: Source S3 bucket name
         :type source_bucket: str
         :param destination_bucket: Destination S3 bucket name
         :type destination_bucket: str
+        :param db_client: Optional DatabaseClient for DI/testing
+        :type db_client: Optional[DatabaseClient]
         """
         self.source_bucket = source_bucket
         self.destination_bucket = destination_bucket
-        self.db = DatabaseClient(db_alias='bms')
+        self.db = db_client or DatabaseClient()
+        self.attachment_repo = AttachmentRepository(self.db)
 
     def analyze_agency_data(self, agency_id: int, dry_run: bool = False) -> Dict[str, Any]:
         """Analyze agency data without performing any external operations.
@@ -120,7 +125,7 @@ class AgencyDataJob:
             folder_name = agency_s3_slug if agency_s3_slug else f"agency-{agency_id}"
 
             # Analyze files (read-only)
-            db_results = self.db.get_attachment_files_for_s3_processing(agency_id)
+            db_results = self.attachment_repo.get_attachment_files_for_s3_processing(agency_id)
             forms = [f for f in db_results if f['attachable_type'] == 'Form']
             user_docs = [f for f in db_results if f['attachable_type'] == 'UserDocument']
             total_size_mb = sum(f.get('byte_size', 0) for f in db_results) / 1024 / 1024
@@ -173,7 +178,7 @@ class AgencyDataJob:
         """
         try:
             # Read-only inputs
-            db_results = self.db.get_attachment_files_for_s3_processing(agency_id)
+            db_results = self.attachment_repo.get_attachment_files_for_s3_processing(agency_id)
             agency_s3_slug = self.db.get_agency_s3_slug(agency_id)
 
             if not dry_run:

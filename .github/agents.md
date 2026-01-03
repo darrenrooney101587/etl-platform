@@ -22,6 +22,12 @@ This file defines **behavioral rules and decision-making logic** for autonomous 
 - Agents **follow** `agents.md` for behavioral decisions and enforcement
 - Together these files ensure consistent, high-quality code generation.
 
+## Database ownership and repository separation
+
+- Agents must enforce that `etl_core` does not contain domain-specific SQL. `etl_core` may expose a minimal DB client (for example `DatabaseClient.execute_query`) but all business queries or ETL-specific SQL must live in package-level repositories (for example `packages/data_pipeline/repositories`).
+- When refactoring or migrating code, agents should move SQL from `etl_core` into the appropriate package repository and update job code to call repository methods.
+- Agents should warn in PR descriptions when changes introduce domain SQL into `etl_core` and suggest moving it to a repository module.
+
 ---
 
 # Global Agent Rules

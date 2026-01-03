@@ -1,60 +1,141 @@
 import logging
+import os
 from typing import Any, Dict, List, Optional
-
-from django.db import connections as django_connections
-from packages.etl_core.support import get_env_bms_id_field, get_env_s3_field
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseClient:
-    """Database client for read-only reporting queries.
+    """Lightweight psycopg2-backed DB client for executing queries.
 
-    Encapsulates database access to the BMS data source with dependency injection
-    for testability. Environment-specific behavior (e.g., which columns to select)
-    is provided via utilities.
+    Responsibilities:
+    - Provide a minimal, DI-friendly API for executing SQL and returning dict rows.
+    - Avoid embedding domain-specific SQL. Domain repositories should live in package modules
+      (for example `packages/data_pipeline/repositories`).
 
-    :param connections: Django connections mapping to use; defaults to django.db.connections
-    :type connections: Optional[Any]
-    :param db_alias: Database alias to use for queries; defaults to 'bms'
-    :type db_alias: str
+    Construction:
+      - Pass an existing DB connection via `connection` for tests, or
+      - Provide a DSN via `dsn`, or rely on environment variables (DATABASE_URL or DB_*).
     """
 
-    def __init__(self, connections: Optional[Any] = None, db_alias: str = "bms") -> None:
-        self._connections = connections or django_connections
+    def __init__(self, connection: Optional[Any] = None, dsn: Optional[str] = None, connections: Optional[Any] = None, db_alias: str = "bms") -> None:
+        self._conn: Optional[Any] = connection
+        self._dsn = dsn
+        self._connections = connections
         self._db_alias = db_alias
 
-    def _log_db_connections(self, context: str, db_alias: str = "bms") -> None:
-        """Log configured DB settings for debugging.
+    def _ensure_connection(self) -> Any:
+        """Lazily create and return a psycopg2 connection.
 
-        :param context: Calling context for log correlation
-        :type context: str
+        The psycopg2 import is deferred until a real connection is required so the
+        module can be imported in environments where the driver is not installed.
         """
+        if self._conn:
+            return self._conn
+
         try:
-            db_settings = self._connections[db_alias].settings_dict
-            db_info = {
-                self._db_alias: {
-                    "USER": db_settings.get("USER"),
-                    "NAME": db_settings.get("NAME"),
-                    "HOST": db_settings.get("HOST"),
-                    "PORT": db_settings.get("PORT"),
-                }
-            }
-            print(f"{context} -> db_settings={db_info}")
+            import psycopg2
+            from psycopg2 import extras  # noqa: F401 - imported for cursor factories
+        except Exception as exc:  # pragma: no cover - runtime dependency
+            raise RuntimeError(
+                "psycopg2 is required to use DatabaseClient. Install 'psycopg2-binary'."
+            ) from exc
+
+        if self._dsn:
+            conn = psycopg2.connect(self._dsn)
+        else:
+            dsn_env = os.getenv("DATABASE_URL")
+            if dsn_env:
+                conn = psycopg2.connect(dsn_env)
+            else:
+                host = os.getenv("DB_HOST", "localhost")
+                port = int(os.getenv("DB_PORT", "5432"))
+                dbname = os.getenv("DB_NAME", "postgres")
+                user = os.getenv("DB_USER", "postgres")
+                password = os.getenv("DB_PASSWORD", "")
+                sslmode = os.getenv("DB_SSLMODE", "prefer")
+
+                conn = psycopg2.connect(
+                    host=host,
+                    port=port,
+                    dbname=dbname,
+                    user=user,
+                    password=password,
+                    sslmode=sslmode,
+                )
+
+        # Use autocommit for simple read queries
+        conn.autocommit = True
+        self._conn = conn
+        return self._conn
+
+    def close(self) -> None:
+        """Close the underlying DB connection, if any."""
+        try:
+            if self._conn:
+                self._conn.close()
+        finally:
+            self._conn = None
+
+    def _log_db_connections(self, context: str) -> None:
+        """Log configured DB settings for debugging without exposing secrets."""
+        try:
+            dsn = self._dsn or os.getenv("DATABASE_URL")
+            if dsn:
+                logger.info(f"{context} -> using DSN connection (redacted)")
+                return
+            host = os.getenv("DB_HOST", "localhost")
+            port = os.getenv("DB_PORT", "5432")
+            dbname = os.getenv("DB_NAME", "<unset>")
+            user = os.getenv("DB_USER", "<unset>")
+            logger.info(f"{context} -> host={host} port={port} db={dbname} user={user}")
         except Exception as exc:
-            logger.warning(f"{context} -> failed to read DB settings: {exc}")
+            logger.warning(f"{context} -> failed to log DB settings: {exc}")
+
+    def execute_query(self, sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+        """Execute a read-only SQL query and return rows as dictionaries.
+
+        This is the only query surface etl_core exposes; domain SQL must live in
+        package-level repositories (for example, `packages/data_pipeline/repositories`).
+
+        Args:
+            sql: SQL statement to execute.
+            params: Optional list/tuple of parameters.
+
+        Returns:
+            List of rows as dicts.
+        """
+        self._log_db_connections("execute_query")
+        try:
+            conn = self._ensure_connection()
+            import psycopg2.extras as _extras  # type: ignore
+            with conn.cursor(cursor_factory=_extras.RealDictCursor) as cursor:
+                cursor.execute(sql, params or [])
+                rows = cursor.fetchall()
+                return [dict(r) for r in rows]
+        except Exception as exc:
+            logger.error("Database query failed: %s", exc)
+            raise
+
+    # ------------------------------------------------------------------
+    # Backwards-compatible domain methods (tests expect these on the client)
+    # These methods use a provided `connections` mapping (Django style) when
+    # available (the test harness injects a MagicMock for this). Otherwise
+    # they fall back to the generic execute_query surface.
+    # ------------------------------------------------------------------
+    def _execute_via_connections(self, sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+        if not self._connections:
+            return self.execute_query(sql, params)
+
+        with self._connections[self._db_alias].cursor() as cursor:
+            cursor.execute(sql, params or [])
+            columns = [col[0] for col in cursor.description] if cursor.description else []
+            results: List[Dict[str, Any]] = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+            return results
 
     def get_attachment_files_for_s3_processing(self, agency_id: int) -> List[Dict[str, Any]]:
-        """Return latest unprocessed attachment files for the given agency.
-
-        :param agency_id: Agency identifier
-        :type agency_id: int
-        :return: File mappings for S3 processing
-        :rtype: List[Dict[str, Any]]
-        :raises Exception: Propagates DB errors
-        """
-        self._log_db_connections("get_attachment_files_for_s3_processing", self._db_alias)
-
         sql_query = """
         WITH ranked AS (
             SELECT
@@ -118,61 +199,40 @@ class DatabaseClient:
         UNION
         SELECT * FROM users
         """
-
-        try:
-            with self._connections[self._db_alias].cursor() as cursor:
-                cursor.execute(sql_query, [agency_id])
-                columns = [col[0] for col in cursor.description]
-                results: List[Dict[str, Any]] = []
-                for row in cursor.fetchall():
-                    results.append(dict(zip(columns, row)))
-                logger.info(f"Retrieved {len(results)} files for S3 processing from agency {agency_id}")
-                return results
-        except Exception as e:
-            logger.error(f"Error executing S3 files query: {e}")
-            raise
+        return self._execute_via_connections(sql_query, [agency_id])
 
     def get_agency_s3_slug(self, agency_id: int) -> str:
-        """Return the S3 slug for the given agency based on environment mapping.
+        try:
+            from etl_core.support.utilities import get_env_bms_id_field, get_env_s3_field
+        except Exception:
+            from etl_core.support.utilities import get_env_bms_id_field, get_env_s3_field
 
-        :param agency_id: Agency identifier
-        :type agency_id: int
-        :return: S3 slug or empty string when not found
-        :rtype: str
-        :raises Exception: Propagates DB errors
-        """
-        self._log_db_connections("get_agency_s3_slug")
         where_clause = get_env_bms_id_field()
         select_column = get_env_s3_field()
-
         sql_query = f"""
                     SELECT {select_column}
                     FROM reporting.ref_agency_designations rad
                     WHERE {where_clause} = %s
                     """
-        try:
+        # If a Django-style connections mapping is provided, use cursor.fetchone()
+        if self._connections:
             with self._connections[self._db_alias].cursor() as cursor:
                 cursor.execute(sql_query, [int(agency_id)])
                 result = cursor.fetchone()
                 if result:
-                    print(result[0])
-                    return result[0]
-                logger.warning(f"No S3 slug found for agency ID {agency_id}")
+                    # result may be a tuple; return first element
+                    return result[0] if isinstance(result, (list, tuple)) else result
                 return ""
-        except Exception as e:
-            logger.error(f"Error retrieving S3 slug for agency ID {agency_id}: {e}")
-            raise
+
+        # Fallback to generic execute_query which returns list of dict rows
+        rows = self.execute_query(sql_query, [int(agency_id)])
+        if rows:
+            first = rows[0]
+            # try to return select_column if present, otherwise first value
+            return first.get(select_column) or (list(first.values())[0] if first else "")
+        return ""
 
     def get_organization_employment_history(self, agency_id: int) -> List[Dict[str, Any]]:
-        """Return employment history records for all users in the given agency.
-
-        :param agency_id: Agency identifier
-        :type agency_id: int
-        :return: Employment history rows
-        :rtype: List[Dict[str, Any]]
-        :raises Exception: Propagates DB errors
-        """
-        self._log_db_connections("get_organization_employment_history")
         sql_query = """
         SELECT 
             ou.display_name,
@@ -197,22 +257,10 @@ class DatabaseClient:
         ON bu.integration_id = uouh.user_id 
         WHERE t.agency_id = %s
         """
-
-        try:
-            with self._connections[self._db_alias].cursor() as cursor:
-                cursor.execute(sql_query, [agency_id])
-                columns = [col[0] for col in cursor.description]
-                results: List[Dict[str, Any]] = []
-                for row in cursor.fetchall():
-                    results.append(dict(zip(columns, row)))
-                logger.info(f"Retrieved {len(results)} employment history records for agency {agency_id}")
-                return results
-        except Exception as e:
-            logger.error(f"Error executing employment history query: {e}")
-            raise
+        return self._execute_via_connections(sql_query, [agency_id])
 
 
 if __name__ == "__main__":
     # Minimal manual check when running directly (no DB calls executed)
-    client = DatabaseClient()
-    logger.info(f"DatabaseClient initialized with alias 'bms': {bool(client)}")
+    c = DatabaseClient()
+    logger.info(f"DatabaseClient initialized: {bool(c)}")

@@ -11,6 +11,7 @@ packages = [{include = "etl_core", from = "."}]
 python = "^3.10"
 # Core ETL runtime dependencies used by S3/FTPS utilities
 boto3 = "^1.26"
+psycopg2-binary = "^2.9"
 
 [build-system]
 requires = ["poetry-core"]

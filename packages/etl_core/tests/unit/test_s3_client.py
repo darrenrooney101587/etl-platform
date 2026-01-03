@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from botocore.exceptions import NoCredentialsError
 
 from etl_core.config.config import S3Config
-from data_pipeline.config.config import EmploymentHistoryConfig
+from etl_core.config.config import EmploymentHistoryConfig
 from etl_core.s3.client import S3Client
 
 

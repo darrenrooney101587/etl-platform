@@ -1,4 +1,5 @@
 from data_pipeline.config.factory import create_s3_processor, create_employment_history_processor
+from etl_core.config.config import S3Config, EmploymentHistoryConfig
 from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
 from data_pipeline.processors.s3_file_processor import S3FileProcessor
 from data_pipeline.tests.unit.conftest import setup_mocks

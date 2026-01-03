@@ -4,8 +4,8 @@ Unit tests for the DatabaseClient in data_pipeline.database.client.
 These tests focus on database query functionality and data processing utilities
 exposed by the DatabaseClient methods, using injected mock connections for isolation.
 """
-from data_pipeline.database.client import DatabaseClient
-from data_pipeline.tests.unit.conftest import setup_mocks
+from etl_core.database.client import DatabaseClient
+from etl_core.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 
