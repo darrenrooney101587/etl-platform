@@ -1,94 +1,19 @@
 """
-Job logic for processing Agency Data (S3 files and Employment History).
+Service layer for S3 file processing operations.
 
 This module encapsulates the business logic for processing S3 files and employment
 history data, making it reusable across different interfaces (management commands, API endpoints).
 """
-import argparse
 import logging
-import sys
-import traceback
-from typing import Any, Dict, List
+from typing import Any, Dict, Optional
 
-from etl_core.database.client import DatabaseClient
-from etl_core.config.config import EmploymentHistoryConfig, S3Config
-from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
-from data_pipeline.shared.s3_adapter import get_configured_processor, upload_attachment_manifest
+from service.config.factory import create_employment_history_processor, create_s3_processor
+from service.database.client import DatabaseClient
 
 logger = logging.getLogger(__name__)
 
-
-def _print_results(result: Dict[str, Any]) -> None:
-    """Print the results returned by AgencyDataJob in a human-friendly format."""
-    if result.get("status") in ("error", "warning"):
-        print(f"{result.get('status').upper()}: {result.get('message')}")
-        return
-
-    results_data = result.get("results", {})
-    print(f"Processing completed: {result.get('message')}")
-    print(f"Files processed: {results_data.get('files_processed')}")
-    print(f"Files successful: {results_data.get('files_successful')}")
-    print(f"Files failed: {results_data.get('files_failed')}")
-
-    failed = results_data.get('failed_files') or []
-    if failed:
-        print("Failed files:")
-        for f in failed:
-            print(f"  - {f.get('source_key')}: {f.get('message')}")
-
-    csv_res = results_data.get('csv_upload')
-    if csv_res:
-        status = "success" if csv_res.get('status') == 'success' else 'error'
-        print(f"Metadata CSV: {status} {csv_res.get('message', '')}")
-
-    emp = results_data.get('employment_history')
-    if emp:
-        status = (
-            "success" if emp.get('status') == 'success' else
-            "error" if emp.get('status') == 'error' else
-            "warning"
-        )
-        print(f"Employment History: {status} {emp.get('message', '')}")
-        if emp.get('status') == 'success':
-            print(f"  Records: {emp.get('records_count', 0)}")
-
-
-def entrypoint(argv: List[str]) -> int:
-    """CLI entrypoint for Agency Data Job."""
-    parser = argparse.ArgumentParser(description="Process S3 files and employment history for an agency")
-    parser.add_argument("--agency-id", type=int, default=10, help="Agency ID to filter by (default: 10)")
-    parser.add_argument(
-        "--source-bucket",
-        type=str,
-        default="benchmarkanalytics-production-env-userdocument-test",
-        help="Source S3 bucket name"
-    )
-    parser.add_argument(
-        "--destination-bucket",
-        type=str,
-        default="etl-ba-research-client-etl",
-        help="Destination S3 bucket name"
-    )
-
-    args = parser.parse_args(argv)
-
-    try:
-        service = AgencyDataJob(source_bucket=args.source_bucket, destination_bucket=args.destination_bucket)
-        result = service.process_agency_files(args.agency_id)
-        _print_results(result)
-
-        if result.get('status') == 'error':
-            return 2
-        return 0
-
-    except Exception as exc:
-        print(f"Error during processing: {exc}")
-        traceback.print_exc()
-        return 1
-
-
-class AgencyDataJob:
-    """Job class that handles S3 file processing operations for an agency."""
+class ServiceHandler:
+    """Service class that handles S3 file processing operations."""
 
     def __init__(self,
                  source_bucket: str,
@@ -99,6 +24,10 @@ class AgencyDataJob:
         :type source_bucket: str
         :param destination_bucket: Destination S3 bucket name
         :type destination_bucket: str
+        :param progress_callback: Optional progress callback function
+        :type progress_callback: Optional[Callable]
+        :param db_client: Optional database client to inject for testability
+        :type db_client: Optional[DatabaseClient]
         """
         self.source_bucket = source_bucket
         self.destination_bucket = destination_bucket
@@ -128,8 +57,9 @@ class AgencyDataJob:
             # Analyze employment history (read-only)
             employment_count = 0
             try:
-                employment_processor = self._create_employment_history_processor(
+                employment_processor = create_employment_history_processor(
                     agency_id=agency_id,
+                    destination_bucket=self.destination_bucket,
                     agency_s3_slug=agency_s3_slug,
                     destination_prefix='/downloads/'
                 )
@@ -192,9 +122,11 @@ class AgencyDataJob:
                     }
 
                 # Create processor
-                processor = self._create_s3_processor(
-                    agency_id=agency_id,
+                processor = create_s3_processor(
+                    source_bucket=self.source_bucket,
+                    destination_bucket=self.destination_bucket,
                     agency_s3_slug=agency_s3_slug,
+                    agency_id=agency_id,
                     destination_prefix='/downloads/'
                 )
 
@@ -205,7 +137,7 @@ class AgencyDataJob:
                 )
 
                 # Upload metadata CSV
-                csv_result = upload_attachment_manifest(processor, db_results)
+                csv_result = processor.upload_metadata_csv(db_results)
 
                 # Process employment history
                 employment_result = self._process_employment_history(
@@ -233,8 +165,9 @@ class AgencyDataJob:
                 # Dry run: Compute planned steps without performing external actions
                 files_planned = len(db_results)
                 try:
-                    employment_processor = self._create_employment_history_processor(
+                    employment_processor = create_employment_history_processor(
                         agency_id=agency_id,
+                        destination_bucket=self.destination_bucket,
                         agency_s3_slug=agency_s3_slug,
                         destination_prefix='/downloads/'
                     )
@@ -276,8 +209,9 @@ class AgencyDataJob:
         :rtype: Dict[str, Any]
         """
         try:
-            employment_processor = self._create_employment_history_processor(
+            employment_processor = create_employment_history_processor(
                 agency_id=agency_id,
+                destination_bucket=self.destination_bucket,
                 agency_s3_slug=agency_s3_slug,
                 destination_prefix='/downloads/'
             )
@@ -301,27 +235,3 @@ class AgencyDataJob:
                 'message': f'Error processing employment history: {str(e)}',
                 'records_count': 0
             }
-
-    def _create_s3_processor(self, agency_id: int, agency_s3_slug: str, destination_prefix: str):
-        config = S3Config(
-            source_bucket=self.source_bucket,
-            destination_bucket=self.destination_bucket,
-            agency_s3_slug=agency_s3_slug,
-            agency_id=agency_id,
-            destination_prefix=destination_prefix
-        )
-        # Use the adapter to get a configured processor
-        return get_configured_processor(config, agency_id=str(agency_id))
-
-    def _create_employment_history_processor(self, agency_id: int, agency_s3_slug: str, destination_prefix: str):
-        config = EmploymentHistoryConfig(
-            agency_id=agency_id,
-            destination_bucket=self.destination_bucket,
-            agency_s3_slug=agency_s3_slug,
-            destination_prefix=destination_prefix
-        )
-        return EmploymentHistoryProcessor(config)
-
-
-# Expose JOB as a lightweight tuple (entrypoint, description) to avoid importing registry types here
-JOB = (entrypoint, (__doc__ or "Agency data processing job").strip().splitlines()[0])

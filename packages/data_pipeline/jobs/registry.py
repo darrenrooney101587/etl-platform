@@ -9,6 +9,7 @@ class JobDefinition(NamedTuple):
     entrypoint: Callable[[List[str]], int]
     description: str
 
+
 def _load_static_cli_entries() -> Dict[str, JobDefinition]:
     """Load explicit CLI-backed jobs for backward compatibility.
 
@@ -16,21 +17,14 @@ def _load_static_cli_entries() -> Dict[str, JobDefinition]:
     kept for compatibility with existing console scripts.
     """
     entries: Dict[str, JobDefinition] = {}
-    try:
-        mod = importlib.import_module("data_pipeline.cli.get_s3_files")
-        if hasattr(mod, "main"):
-            entries["get-s3-files"] = JobDefinition(entrypoint=mod.main, description="Process S3 files and employment history")
-    except Exception:
-        logger.debug("Legacy CLI job `get_s3_files` not available", exc_info=True)
     return entries
+
 
 def _discover_jobs() -> Dict[str, JobDefinition]:
     """Discover job modules under the `data_pipeline.jobs` package.
 
-    Conventions supported (in order):
-      - module exposes a `JOB` variable of type JobDefinition
-      - module exposes `get_job_definition()` -> JobDefinition
-      - module exposes an `entrypoint` callable and optional module docstring
+    New convention (single source of truth):
+      - module must expose a `JOB` variable of type JobDefinition
 
     Module names starting with underscore or named 'registry' are ignored.
     """
@@ -51,34 +45,28 @@ def _discover_jobs() -> Dict[str, JobDefinition]:
             logger.warning("Failed to import job module %s", full_name, exc_info=True)
             continue
 
-        # Priority: JOB var -> get_job_definition() -> entrypoint callable
-        job_def = None
+        # Strict convention: module must expose JOB = JobDefinition(...)
         if hasattr(mod, "JOB"):
             candidate = getattr(mod, "JOB")
+            # Accept explicit JobDefinition instances
             if isinstance(candidate, JobDefinition):
-                job_def = candidate
-        if job_def is None and hasattr(mod, "get_job_definition"):
-            try:
-                candidate = mod.get_job_definition()
-                if isinstance(candidate, JobDefinition):
-                    job_def = candidate
-            except Exception:
-                logger.warning("get_job_definition() failed for %s", full_name, exc_info=True)
-        if job_def is None and hasattr(mod, "entrypoint") and callable(getattr(mod, "entrypoint")):
-            desc = (mod.__doc__ or "").strip().splitlines()[0] if mod.__doc__ else ""
-            job_def = JobDefinition(entrypoint=getattr(mod, "entrypoint"), description=desc or name)
-
-        if job_def:
-            # Use module name as the job key unless the module provides a preferred name via description
-            entries[name] = job_def
+                entries[name] = candidate
+            # Accept a lightweight tuple form (callable, description) to avoid circular imports in job modules
+            elif isinstance(candidate, (list, tuple)) and len(candidate) == 2 and callable(candidate[0]) and isinstance(candidate[1], str):
+                entries[name] = JobDefinition(entrypoint=candidate[0], description=candidate[1])
+            else:
+                logger.warning("JOB in %s is not a JobDefinition or tuple(entrypoint, description); ignoring", full_name)
+        else:
+            logger.warning("Job module %s does not expose JOB; ignoring (migrate to JOB variable)", full_name)
 
     return entries
+
 
 def get_registry() -> Dict[str, JobDefinition]:
     """Return a registry of available jobs.
 
-    This implementation supports dynamic discovery of job modules under
-    `data_pipeline.jobs` while preserving a small set of legacy CLI-backed jobs.
+    This implementation supports discovery of job modules under
+    `data_pipeline.jobs` and expects each module to expose a `JOB` variable.
     """
     registry: Dict[str, JobDefinition] = {}
     # Load legacy CLI-backed entries first (keeps stable names)
