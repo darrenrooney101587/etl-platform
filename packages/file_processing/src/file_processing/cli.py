@@ -1,14 +1,13 @@
 """CLI entrypoint for the file_processing module.
 
-This module provides a minimal placeholder `main()` used when the
-`file-processing` console script is invoked. It prints a simple help
-message and exits with code 0. This is intentionally minimal and
-suitable for EKS Job ENTRYPOINT defaults.
+Dispatches subcommands (currently `data-quality`) to the appropriate job entrypoints.
 """
 from __future__ import annotations
 
 import sys
 from typing import List
+
+from file_processing.jobs.data_quality_job import entrypoint as data_quality_entrypoint
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -25,12 +24,15 @@ def main(argv: List[str] | None = None) -> int:
 
     # If user asked for help or provided no args, print a short help message
     if not argv or "-h" in argv or "--help" in argv:
-        print("file-processing: placeholder CLI. Usage: file-processing [--help]")
+        print("file-processing: available commands")
+        print("  data-quality --agency-id <id>   Run attachment data quality checks")
         return 0
 
-    # For any other args just echo them and exit 0 (keeps placeholder behavior)
-    print("file-processing: received args:", " ".join(argv))
-    return 0
+    if argv[0] == "data-quality":
+        return data_quality_entrypoint(argv[1:])
+
+    print("file-processing: unknown command. Use --help for options.")
+    return 1
 
 
 if __name__ == "__main__":
