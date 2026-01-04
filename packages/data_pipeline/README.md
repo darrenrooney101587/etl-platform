@@ -246,3 +246,65 @@ spec:
 - [ ] No heavy import-time side-effects
 - [ ] Unit tests added under `packages/data_pipeline/tests/unit`
 - [ ] Docker image runs `data-pipeline` as ENTRYPOINT and manifest uses `run <job_name>`
+
+## Jobs vs Processors — conceptual separation
+
+When developing in `packages/data_pipeline` you'll see two primary abstractions: "jobs" and "processors". Keep the distinction clear — it improves testability, ownership, and scale.
+
+- Job (location: `packages/data_pipeline/jobs`)
+  - Purpose: orchestration and operational concerns. A job wires together configuration, repositories, processors, and adapters; it parses CLI args, composes resources, and maps results to exit codes and human-friendly output.
+  - Characteristics:
+    - Small module with a single public entrypoint (see `JOB = (entrypoint, description)` convention).
+    - Responsible for CLI parsing, high-level error handling, logging, and progress reporting.
+    - Does not contain business-domain SQL or low-level data access logic.
+    - Accepts dependencies via constructor injection (DB client, S3 client, repositories) for testability.
+  - Example responsibilities:
+    - Constructing an `S3Config` and a configured S3 processor adapter.
+    - Calling `AttachmentRepository.get_attachment_files_for_s3_processing(agency_id)`.
+    - Calling processor methods to copy files and upload metadata.
+    - Aggregating results and returning a process exit code.
+
+- Processor (location: `packages/data_pipeline/processors` or `packages/etl_core/processors`)
+  - Purpose: encapsulate focused, reusable business logic and operations (for example: S3 file copying, employment history CSV creation and upload).
+  - Characteristics:
+    - Implemented as classes or small modules with clear public methods (for example `process_files`, `fetch_data`, `upload_to_s3`).
+    - Accept dependencies through the constructor (S3 client, DB client, configuration dataclass).
+    - Can be reused by multiple jobs and by higher-level orchestrators.
+    - Keep side effects explicit: methods that perform side effects (S3 upload, DB writes) should be separate from read-only helpers.
+  - Example responsibilities:
+    - Given a list of file mappings, perform copies and return a list of per-file results.
+    - Given an agency id, fetch employment history rows and format them as CSV-ready dicts.
+
+Why this separation helps
+
+- Testability: processors are easy to unit test by injecting fake S3/DB clients; jobs can be tested by injecting fake processors and repositories.
+- Ownership: domain SQL and data-shaping lives in package-level repositories (e.g. `packages/data_pipeline/repositories`) instead of `etl_core` (which stays generic).
+- Reuse: processors implement mechanics once and are used by many jobs (reduces duplication).
+- Operations: Jobs remain thin and focus on logging, retries policy, and mapping to orchestration systems (K8s exit codes, metrics), making them safer to run at scale.
+
+Contract (how to design a processor)
+
+- Inputs: simple typed values or dataclasses (e.g. `S3Config`, `EmploymentHistoryConfig`) and dependency objects (clients/adapters).
+- Outputs: plain Python types (dicts, lists) describing results or summaries. Avoid returning framework-specific types.
+- Error handling: processors should raise exceptions for unexpected failures and return structured result dicts for expected outcomes (for example a per-file status row). Jobs should catch exceptions and decide whether to retry, warn, or fail the whole job.
+- Idempotency: where possible, make processor operations idempotent (so retries are safe).
+
+Edge cases to consider
+
+- Empty inputs (no files / no employment rows) — processors should return clear "no-op" results, not throw.
+- Partial failures — processors should return per-item status so the job can continue processing other items and report failures.
+- Timeouts / retries — keep retry behaviour small and configurable on the processor via config.
+
+Testing guidance
+
+- Unit tests for processors: inject fake clients (S3, DB) and assert method outputs. Use `unittest.TestCase` and keep tests fast.
+- Unit tests for jobs: inject fake processors/repositories and assert the job parses args, calls the correct methods, and returns expected exit codes and printed output.
+- Integration tests: run a job entrypoint with a test Postgres or S3 emulator (optional for CI).
+
+Quick checklist for adding a Processor
+
+- [ ] Add class under `packages/data_pipeline/processors` (or `etl_core/processors` if generic)
+- [ ] Accept `config` dataclass + client dependencies in constructor
+- [ ] Keep public methods small and side-effects explicit
+- [ ] Add unit tests in `packages/data_pipeline/tests/unit`
+- [ ] Document the processor in the job README if it is job-specific

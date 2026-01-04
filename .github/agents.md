@@ -28,6 +28,17 @@ This file defines **behavioral rules and decision-making logic** for autonomous 
 - When refactoring or migrating code, agents should move SQL from `etl_core` into the appropriate package repository and update job code to call repository methods.
 - Agents should warn in PR descriptions when changes introduce domain SQL into `etl_core` and suggest moving it to a repository module.
 
+## Jobs vs Processors guidance for agents
+
+- Agents generating or refactoring code must follow the `jobs` vs `processors` separation:
+  - Jobs live in `packages/data_pipeline/jobs` and must export a top-level `JOB` tuple: `(entrypoint, description)`.
+  - Processors live in `packages/data_pipeline/processors` (or `packages/etl_core/processors` if generic) and implement reusable business operations. They accept config dataclasses and client dependencies via constructor injection.
+  - Repositories live in `packages/data_pipeline/repositories` and contain domain SQL. They accept a `DatabaseClient` via constructor injection.
+
+- Agents must not place domain SQL in `etl_core` and must not create heavy import-time side-effects in job modules. If an agent detects a migration that would move SQL into `etl_core`, it should automatically propose the code movement and update callers.
+
+- When reporting changes or creating PRs, agents should include a short checklist confirming: job exposes `JOB`, processors accept DI, repositories hold SQL, and `etl_core` contains only generic utilities.
+
 ---
 
 # Global Agent Rules

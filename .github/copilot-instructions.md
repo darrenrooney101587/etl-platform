@@ -102,3 +102,27 @@ All classes that talk to external resources (AWS, HTTP clients, DB connectors, r
 - Use **unittest.TestCase** for all tests.
 - Include a `if __name__ == "__main__": unittest.main()` block.
 - Use DI to mock all external resources.
+
+## Jobs vs Processors (for authors and agents)
+
+- Purpose: Make the runtime separation explicit so code, tests, and automated agents follow the same conventions.
+
+- Jobs (`packages/data_pipeline/jobs`):
+  - Orchestration and operational surface only.
+  - Responsibilities: parse CLI args, wire configs/repositories/processors, perform high-level error handling, map to exit codes and logs.
+  - MUST NOT contain domain SQL or heavy data access logic. Use DI to accept repository and processor instances.
+  - Discovery contract: job modules MUST export a top-level `JOB` tuple: `(entrypoint, description)` where `entrypoint(argv: List[str]) -> int`.
+
+- Processors (`packages/data_pipeline/processors` or `packages/etl_core/processors`):
+  - Focused reusable business logic (S3 file transforms, CSV creation, data shaping).
+  - Accept typed `config` dataclasses and client dependencies via constructor injection.
+  - Return plain Python structures (dict/list) and raise exceptions for unexpected failures.
+  - Keep side-effects explicit and idempotent where possible.
+
+- Repositories (`packages/data_pipeline/repositories`):
+  - Contain domain SQL and data-shaping logic; accept a `DatabaseClient` via constructor injection.
+  - `etl_core` must NOT contain business SQL — it may provide only a minimal `DatabaseClient.execute_query`.
+
+- Tests and agents:
+  - Unit tests should inject fakes/mocks for external resources (DB, S3) using `unittest.TestCase`.
+  - Agents must enforce this separation: when moving or generating code, place domain SQL in repositories, business operations in processors, and orchestration in jobs.
