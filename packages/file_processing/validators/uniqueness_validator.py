@@ -40,7 +40,6 @@ class UniquenessValidator(BaseValidator):
             // or
             "columns": [
                 {"name": "id", "unique": true},
-                {"name": "pk_col", "primary_key": true},
                 ...
             ]
         }
