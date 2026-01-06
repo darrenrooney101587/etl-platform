@@ -8,8 +8,10 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import os
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Union
+from io import BytesIO
+from typing import Any, Dict, List, Optional
 
 import boto3
 from botocore.exceptions import NoCredentialsError
@@ -123,3 +125,52 @@ class S3Client:
 
         except Exception as e:
             return {'status': 'error', 'message': f'Error uploading data CSV: {str(e)}'}
+
+
+class LocalS3ObjectBody:
+    """File-like body wrapper matching boto3 get_object()['Body']."""
+
+    def __init__(self, data: bytes) -> None:
+        self._bio = BytesIO(data)
+
+    def read(self) -> bytes:
+        """Read all bytes."""
+        return self._bio.read()
+
+
+class LocalS3BotoClient:
+    """Minimal boto3 S3 client shim reading objects from local disk.
+
+    This is intended for local development where we want to run the production
+    processing code paths without accessing AWS.
+
+    Mapping rules:
+    - LOCAL_S3_ROOT must point to a directory.
+    - Requested Key is resolved relative to LOCAL_S3_ROOT.
+    """
+
+    def __init__(self, root_dir: str) -> None:
+        self._root_dir = root_dir
+
+    def get_object(self, Bucket: str, Key: str) -> Dict[str, Any]:  # noqa: N803
+        path = os.path.join(self._root_dir, Key.lstrip("/"))
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Local S3 object not found: {path}")
+
+        with open(path, "rb") as f:
+            data = f.read()
+
+        return {"Body": LocalS3ObjectBody(data)}
+
+
+def build_s3_client(config: S3Config) -> "S3Client":
+    """Build an S3Client.
+
+    If LOCAL_S3_ROOT is set, the returned S3Client will read objects from disk
+    via a small shim that implements boto3's get_object().
+    """
+    local_root = os.getenv("LOCAL_S3_ROOT")
+    if local_root:
+        return S3Client(config=config, s3_client=LocalS3BotoClient(local_root))
+
+    return S3Client(config=config)

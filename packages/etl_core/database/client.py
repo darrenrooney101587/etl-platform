@@ -112,8 +112,11 @@ class DatabaseClient:
             import psycopg2.extras as _extras  # type: ignore
             with conn.cursor(cursor_factory=_extras.RealDictCursor) as cursor:
                 cursor.execute(sql, params or [])
-                rows = cursor.fetchall()
-                return [dict(r) for r in rows]
+                # Only fetch results if the query returns rows (SELECT, RETURNING)
+                if cursor.description:
+                    rows = cursor.fetchall()
+                    return [dict(r) for r in rows]
+                return []
         except Exception as exc:
             logger.error("Database query failed: %s", exc)
             raise

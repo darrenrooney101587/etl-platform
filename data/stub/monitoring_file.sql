@@ -1,0 +1,2 @@
+insert into reporting.monitoring_file (id, s3_url, file_name, range, is_active, created_at, updated_at, agency_id, agency_slug, has_wildcard, wildcard_mask, notify_slack, is_missing, created_by, is_suppressed, is_file_change_excluded)
+values  (1, 'uat-ba-research-client-etl/from_client/nm_albuquerque/arrest/BenchmarkArrestHistoryData.txt', 'BenchmarkArrestHistoryData.txt', '1.d', true, '2024-05-30 16:41:15.955273', '2024-05-30 16:41:15.955286', 1, 'demo', false, '', false, false, '', false, false);

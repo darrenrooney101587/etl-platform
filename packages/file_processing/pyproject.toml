@@ -1,17 +1,21 @@
 [tool.poetry]
 name = "file-processing"
 version = "0.1.0"
-description = "Combined fileops + data quality runtime lane"
+description = "Data quality validation and file processing pipeline"
 authors = ["Admin <admin@example.com>"]
 readme = "README.md"
-packages = [{ include = "file_processing", from = "src" }]
+packages = [{ include = "file_processing" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
 etl-core = { path = "../etl_core", develop = false }
+pyarrow = { version = "^14.0.0", optional = true }
+
+[tool.poetry.extras]
+parquet = ["pyarrow"]
 
 [tool.poetry.scripts]
-file-processing = "file_processing.cli:main"
+file-processing = "file_processing.cli.main:main"
 
 [build-system]
 requires = ["poetry-core"]

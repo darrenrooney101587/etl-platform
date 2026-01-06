@@ -79,14 +79,18 @@ All classes that talk to external resources (AWS, HTTP clients, DB connectors, r
         - `poetry.lock`
     - Dependencies are scoped per module. Do not add heavy deps globally.
 
-4. **Root Poetry is workspace-only**
-    - Root `pyproject.toml` is for dev tooling and editable path deps.
-    - **Never** build containers from the root project.
-    - Dockerfiles must install from the module directory using that module's lock.
+## Package layout: no `src/` subdirectory
 
-5. **`etl-database-schema` dependency model**
-    - Treat `etl-database-schema` as an external package (Git URL or internal index).
-    - Prefer making it an optional dependency group inside the module.
+- Rule: Do NOT create a `src/` layout inside package modules. All package python source must live at the package root under `packages/<name>/` (for example `packages/file_processing/<python package modules>`), not under `packages/<name>/src/<name>`.
+- Rationale: Our build, packaging, and path-resolution conventions expect package modules to be the top-level directory under `packages/`. The `src/` layout introduces unnecessary import complexity, deviates from repo conventions, and causes tooling mistakes when generating code.
+- Author guidance:
+  - When creating a new package under `packages/`, place the package module files directly at `packages/<name>/<module>.py` or `packages/<name>/<pkg>/__init__.py`.
+  - Ensure `pyproject.toml` and `poetry.lock` remain at the package root (`packages/<name>/`).
+  - Avoid creating `packages/<name>/src/` or adding `sys.path` hacks to compensate for the `src/` layout.
+- Agent enforcement:
+  - Agents must not generate new packages using a `src/` subdirectory.
+  - If an agent detects an existing `src/` layout during generation or refactor, it should either: (a) place new code at the package root instead, or (b) refactor the layout by moving sources to the package root and updating imports. Agents should surface a clear PR note describing the refactor.
+  - CI checks should flag new `src/` directories inside `packages/` as policy violations.
 
 6. **No Django project structure inside job modules**
     - Do not create/keep `manage.py`, `settings.py`, `wsgi.py`, `urls.py`, `views.py`, `apps.py`, `management/commands` inside active module packages.

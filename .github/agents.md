@@ -39,6 +39,17 @@ This file defines **behavioral rules and decision-making logic** for autonomous 
 
 - When reporting changes or creating PRs, agents should include a short checklist confirming: job exposes `JOB`, processors accept DI, repositories hold SQL, and `etl_core` contains only generic utilities.
 
+ ## Prohibited layout: `packages/<module>/src/`
+
+- Agents must NOT generate or leave `src/` subdirectories inside packages (for example: `packages/file_processing/src/...`).
+- Preferred layout: all Python package sources must live directly under `packages/<module>/` (for example `packages/file_processing/<package files>`).
+- If agents encounter an existing `src/` layout during generation, they must:
+  1. Avoid creating new files inside the `src/` tree.
+  2. Propose and optionally apply a refactor that moves source files from `packages/<module>/src/<module>/...` to `packages/<module>/...`, adjusting imports accordingly.
+  3. Include a PR note explaining the refactor and confirming that tests and imports were validated.
+
+- Agents should also add a hint in their PR that CI should run an import/pytest smoke to ensure no import-path regressions were introduced.
+
 ---
 
 # Global Agent Rules
@@ -65,7 +76,7 @@ These rules apply to all agents.
       - no Django imports
       - no ORM imports
       - no settings/migrations
-
+a
 4. **Schema package is external**
    - Django ORM models and migrations live in an external package:
       - **`etl-database-schema`**
