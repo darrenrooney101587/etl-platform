@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from file_processing.models.quality import ProfilePayload, SampleData
 
@@ -44,6 +44,8 @@ class DataProfiler:
         """
         self._max_sample_rows = max_sample_rows
         self._max_distribution_items = max_distribution_items
+        # Fraction of non-null values that must be numeric to treat column as numeric
+        self._numeric_fraction_threshold = 0.5
 
     def generate_profile(
         self,
@@ -80,7 +82,7 @@ class DataProfiler:
         self,
         rows: List[Dict[str, Any]],
         columns: List[str],
-    ) -> Dict[str, Any]:
+    ) -> List[Dict[str, Any]]:
         """Compute statistical summary for numeric columns.
 
         Args:
@@ -88,41 +90,95 @@ class DataProfiler:
             columns: Column names.
 
         Returns:
-            Dictionary with column statistics.
+            List of dictionaries with column statistics.
         """
-        summary: Dict[str, Any] = {
-            "totalRows": len(rows),
-            "totalColumns": len(columns),
-            "columns": {},
-        }
+        import statistics
+
+        summary: List[Dict[str, Any]] = []
 
         for col in columns:
-            values = [row.get(col) for row in rows if row.get(col) is not None]
-            col_summary: Dict[str, Any] = {
-                "count": len(values),
-                "nullCount": len(rows) - len(values),
-            }
+            # Collect non-null values for this column
+            non_null_vals = [row.get(col) for row in rows if row.get(col) is not None and row.get(col) != ""]
 
-            # Try to compute numeric stats
+            # Attempt to coerce to numeric for each value
             numeric_values: List[float] = []
-            for v in values:
-                try:
-                    if isinstance(v, (int, float)) and not isinstance(v, bool):
-                        numeric_values.append(float(v))
-                    elif isinstance(v, str):
-                        numeric_values.append(float(v))
-                except (ValueError, TypeError):
-                    pass
+            for v in non_null_vals:
+                num = self._coerce_number(v)
+                if num is not None:
+                    numeric_values.append(num)
 
-            if numeric_values:
-                col_summary["min"] = min(numeric_values)
-                col_summary["max"] = max(numeric_values)
-                col_summary["mean"] = sum(numeric_values) / len(numeric_values)
-                col_summary["isNumeric"] = True
+            total_non_null = len(non_null_vals)
+            num_count = len(numeric_values)
+            numeric_fraction = (num_count / total_non_null) if total_non_null > 0 else 0.0
+
+            # If enough values are numeric, compute numeric stats
+            if num_count > 0 and numeric_fraction >= self._numeric_fraction_threshold:
+                count = num_count
+                min_val = min(numeric_values)
+                max_val = max(numeric_values)
+                mean_val = statistics.mean(numeric_values)
+                median_val = statistics.median(numeric_values)
+                std_dev = statistics.stdev(numeric_values) if count > 1 else 0.0
+
+                zeros = sum(1 for x in numeric_values if x == 0)
+                negatives = sum(1 for x in numeric_values if x < 0)
+
+                # IQR and Outliers
+                numeric_values_sorted = sorted(numeric_values)
+                q1 = numeric_values_sorted[int(count * 0.25)]
+                q3 = numeric_values_sorted[int(count * 0.75)]
+                iqr = q3 - q1
+                lower_bound = q1 - 1.5 * iqr
+                upper_bound = q3 + 1.5 * iqr
+
+                outliers = [x for x in numeric_values if x < lower_bound or x > upper_bound]
+                outlier_count = len(outliers)
+                outlier_values = outliers[:10]
+
+                # Simple distribution heuristic
+                distribution = "unknown"
+                if iqr > 0 and abs(mean_val - median_val) < (iqr * 0.1):
+                    distribution = "normal"
+                elif mean_val > median_val:
+                    distribution = "skewed-right"
+                else:
+                    distribution = "skewed-left"
+
+                summary.append({
+                    "column": col,
+                    "mean": round(mean_val, 2),
+                    "median": round(median_val, 2),
+                    "stdDev": round(std_dev, 2),
+                    "min": min_val,
+                    "max": max_val,
+                    "count": count,
+                    "zeros": zeros,
+                    "negatives": negatives,
+                    "iqr": round(iqr, 2),
+                    "distribution": distribution,
+                    "outlierCount": outlier_count,
+                    "outlierValues": outlier_values,
+                    "numericFraction": round(numeric_fraction, 3),
+                    "nonNumericCount": total_non_null - num_count,
+                })
             else:
-                col_summary["isNumeric"] = False
+                # Non-numeric or mixed column: emit categorical summary
+                vals = non_null_vals
+                total = len(vals)
+                unique_count = len(set(vals))
+                cardinality = round(100.0 * unique_count / total, 2) if total > 0 else 0.0
+                counter = Counter(vals)
+                top = counter.most_common(10)
+                top_list = [{"value": k, "count": c} for k, c in top]
 
-            summary["columns"][col] = col_summary
+                summary.append({
+                    "column": col,
+                    "type": "categorical",
+                    "count": total,
+                    "uniqueCount": unique_count,
+                    "cardinality": cardinality,
+                    "topValues": top_list,
+                })
 
         return summary
 
@@ -138,34 +194,50 @@ class DataProfiler:
             columns: Column names.
 
         Returns:
-            Dictionary with completeness stats per column.
+            Dictionary with completeness stats.
         """
-        overview: Dict[str, Any] = {
-            "totalRows": len(rows),
-            "columns": {},
-        }
-
-        total_cells = len(rows) * len(columns)
-        total_nulls = 0
-
-        for col in columns:
-            null_count = sum(
-                1 for row in rows
-                if row.get(col) is None or (isinstance(row.get(col), str) and row.get(col).strip() == "")
-            )
-            total_nulls += null_count
-
-            pct = 100.0 * (len(rows) - null_count) / len(rows) if rows else 100.0
-            overview["columns"][col] = {
-                "nullCount": null_count,
-                "completenessPercent": round(pct, 2),
+        total_rows = len(rows)
+        if total_rows == 0:
+            return {
+                "totalRows": 0,
+                "completeRows": 0,
+                "completeRowPercentage": 0.0,
+                "entirelyNullColumns": [],
+                "columnsWithNulls": [],
             }
 
-        overview["overallCompleteness"] = round(
-            100.0 * (total_cells - total_nulls) / total_cells if total_cells > 0 else 100.0, 2
-        )
+        complete_rows = 0
+        columns_null_counts = {col: 0 for col in columns}
 
-        return overview
+        for row in rows:
+            is_complete = True
+            for col in columns:
+                val = row.get(col)
+                is_null = val is None or (isinstance(val, str) and val.strip() == "")
+                if is_null:
+                    columns_null_counts[col] += 1
+                    is_complete = False
+            if is_complete:
+                complete_rows += 1
+
+        complete_row_pct = round(100.0 * complete_rows / total_rows, 2)
+        entirely_null_cols = [col for col, count in columns_null_counts.items() if count == total_rows]
+        columns_with_nulls = [
+            {
+                "column": col,
+                "nulls": count,
+                "nullPercentage": round(100.0 * count / total_rows, 2)
+            }
+            for col, count in columns_null_counts.items() if count > 0
+        ]
+
+        return {
+            "totalRows": total_rows,
+            "completeRows": complete_rows,
+            "completeRowPercentage": complete_row_pct,
+            "entirelyNullColumns": entirely_null_cols,
+            "columnsWithNulls": columns_with_nulls,
+        }
 
     def _detect_type_issues(
         self,
@@ -195,7 +267,13 @@ class DataProfiler:
             if col_name and col_type:
                 column_types[col_name] = col_type
 
-        sample_rows = rows[:100]
+        # Check all rows, or a significant sample if limited
+        check_rows = rows[:1000]
+        total_checked = len(check_rows)
+
+        if total_checked == 0:
+            return []
+
         for col, expected_type in column_types.items():
             if col not in columns:
                 continue
@@ -203,7 +281,10 @@ class DataProfiler:
             mismatches = 0
             examples: List[str] = []
 
-            for row in sample_rows:
+            # Simple heuristic for actual type
+            observed_types = Counter()
+
+            for row in check_rows:
                 value = row.get(col)
                 if value is None:
                     continue
@@ -211,15 +292,23 @@ class DataProfiler:
                 matches, reason = self._value_matches_type(value, expected_type)
                 if not matches:
                     mismatches += 1
-                    if len(examples) < 3:
-                        examples.append(f"{str(value)[:50]} (Reason: {reason})")
+                    observed_types[type(value).__name__] += 1
+                    if len(examples) < 5:
+                        val_str = str(value)
+                        if val_str not in examples:
+                            examples.append(val_str)
 
             if mismatches > 0:
+                most_common_type = observed_types.most_common(1)
+                actual_type = most_common_type[0][0] if most_common_type else "unknown"
+
                 issues.append({
                     "column": col,
                     "expectedType": expected_type,
-                    "mismatchCount": mismatches,
-                    "examples": examples,
+                    "actualType": actual_type,
+                    "invalidCount": mismatches,
+                    "invalidPercentage": round(100.0 * mismatches / total_checked, 2),
+                    "sampleInvalid": examples,
                 })
 
         return issues[:self.MAX_ANOMALY_EXAMPLES]
@@ -278,31 +367,52 @@ class DataProfiler:
         Returns:
             Dictionary with uniqueness stats.
         """
-        overview: Dict[str, Any] = {
-            "columns": {},
-        }
-
-        for col in columns:
-            values = [row.get(col) for row in rows if row.get(col) is not None]
-            unique_count = len(set(values))
-            total_count = len(values)
-
-            uniqueness_ratio = unique_count / total_count if total_count > 0 else 1.0
-
-            overview["columns"][col] = {
-                "uniqueCount": unique_count,
-                "totalCount": total_count,
-                "uniquenessRatio": round(uniqueness_ratio, 4),
-                "isUnique": uniqueness_ratio == 1.0,
+        total_rows = len(rows)
+        if total_rows == 0:
+            return {
+                "totalRows": 0,
+                "uniqueRows": 0,
+                "duplicateRows": 0,
+                "duplicatePercentage": 0.0,
+                "columns": [],
             }
 
-        return overview
+        # Check for full row duplicates (expensive but requested)
+        # Convert rows to tuple of values for hashing
+        row_tuples = [tuple(row.get(col) for col in columns) for row in rows]
+        unique_rows_set = set(row_tuples)
+        unique_rows_count = len(unique_rows_set)
+        duplicate_rows = total_rows - unique_rows_count
+        duplicate_percentage = round(100.0 * duplicate_rows / total_rows, 2)
+
+        column_stats = []
+        for col in columns:
+            values = [row.get(col) for row in rows if row.get(col) is not None]
+            val_total = len(values)
+            unique_count = len(set(values))
+
+            # Cardinality as percentage 0-100
+            cardinality = round(100.0 * unique_count / val_total, 2) if val_total > 0 else 0.0
+
+            column_stats.append({
+                "column": col,
+                "uniqueCount": unique_count,
+                "cardinality": cardinality,
+            })
+
+        return {
+            "totalRows": total_rows,
+            "uniqueRows": unique_rows_count,
+            "duplicateRows": duplicate_rows,
+            "duplicatePercentage": duplicate_percentage,
+            "columns": column_stats,
+        }
 
     def _compute_distributions(
         self,
         rows: List[Dict[str, Any]],
         columns: List[str],
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> List[Dict[str, Any]]:
         """Compute value distributions for categorical columns.
 
         Args:
@@ -310,32 +420,38 @@ class DataProfiler:
             columns: Column names.
 
         Returns:
-            Dictionary mapping column name to distribution list.
+            List of objects containing histogram data.
         """
-        distributions: Dict[str, List[Dict[str, Any]]] = {}
+        distributions: List[Dict[str, Any]] = []
 
         for col in columns:
             values = [row.get(col) for row in rows if row.get(col) is not None]
+            if not values:
+                continue
 
-            # Skip if too many unique values (likely not categorical)
             unique_count = len(set(values))
-            if unique_count > 100 or unique_count == len(values):
+            # Heuristic: treat as categorical if unique count is low relative to row count
+            # or absolute count is small
+            total_rows = len(values)
+            is_categorical = unique_count <= 20 or (unique_count < total_rows * 0.1 and unique_count < 100)
+
+            if not is_categorical:
                 continue
 
             counter = Counter(values)
             most_common = counter.most_common(self._max_distribution_items)
 
-            dist_list: List[Dict[str, Any]] = []
+            histogram: List[Dict[str, Any]] = []
             for value, count in most_common:
-                pct = 100.0 * count / len(values) if values else 0.0
-                dist_list.append({
-                    "value": str(value)[:100],
+                histogram.append({
+                    "bin": str(value)[:50],
                     "count": count,
-                    "percent": round(pct, 2),
                 })
 
-            if dist_list:
-                distributions[col] = dist_list
+            distributions.append({
+                "column": col,
+                "histogram": histogram
+            })
 
         return distributions
 
@@ -368,7 +484,9 @@ class DataProfiler:
             if col_name not in columns or (min_val is None and max_val is None):
                 continue
 
-            for row_idx, row in enumerate(rows[:100]):
+            outliers: List[float] = []
+
+            for row in rows[:1000]: # Check reasonable sample
                 value = row.get(col_name)
                 if value is None:
                     continue
@@ -376,29 +494,28 @@ class DataProfiler:
                 try:
                     num_val = float(value)
                     is_anomaly = False
-                    reason = ""
 
                     if min_val is not None and num_val < float(min_val):
                         is_anomaly = True
-                        reason = f"below min ({min_val})"
 
                     if max_val is not None and num_val > float(max_val):
                         is_anomaly = True
-                        reason = f"above max ({max_val})"
 
                     if is_anomaly:
-                        anomalies.append({
-                            "column": col_name,
-                            "row": row_idx + 1,
-                            "value": value,
-                            "reason": reason,
-                        })
-
-                        if len(anomalies) >= self.MAX_ANOMALY_EXAMPLES:
-                            return anomalies
+                        outliers.append(num_val)
 
                 except (ValueError, TypeError):
                     pass
+
+            if outliers:
+                anomalies.append({
+                    "column": col_name,
+                    "severity": "Medium", # Default
+                    "lowerBound": min_val,
+                    "upperBound": max_val,
+                    "outliersCount": len(outliers),
+                    "exampleValues": outliers[:5]
+                })
 
         return anomalies
 
@@ -428,3 +545,38 @@ class DataProfiler:
             columns=columns,
             rows=row_data,
         )
+
+    def _coerce_number(self, value: Any) -> Optional[float]:
+        """Coerce value to a number, handling various formats.
+
+        Args:
+            value: The value to coerce.
+
+        Returns:
+            The coerced number, or None if coercion failed.
+        """
+        if value is None:
+            return None
+
+        # Handle common numeric formats
+        value_str = str(value).strip()
+
+        # Remove percent sign and convert to float
+        if value_str.endswith("%"):
+            try:
+                return float(value_str[:-1]) / 100.0
+            except ValueError:
+                return None
+
+        # Remove currency symbols and commas, convert to float
+        for prefix in ("$", "£", "€"):
+            if value_str.startswith(prefix):
+                value_str = value_str[len(prefix):]
+                break
+
+        value_str = value_str.replace(",", "")
+
+        try:
+            return float(value_str)
+        except ValueError:
+            return None

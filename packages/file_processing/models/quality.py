@@ -126,11 +126,13 @@ class ProfilePayload:
     - distribution examples: 10-25 items
     """
 
-    statistical_summary: Dict[str, Any] = field(default_factory=dict)
+    # Allow either list or dict forms; canonical internal format is list for frontend
+    statistical_summary: Any = field(default_factory=list)
     completeness_overview: Dict[str, Any] = field(default_factory=dict)
     type_format_issues: List[Dict[str, Any]] = field(default_factory=list)
     uniqueness_overview: Dict[str, Any] = field(default_factory=dict)
-    value_distributions: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    # value_distributions may be produced as a list of {column,histogram} or dict mapping column->hist
+    value_distributions: Any = field(default_factory=list)
     bounds_anomalies: List[Dict[str, Any]] = field(default_factory=list)
     sample_data: Optional[SampleData] = None
 
@@ -140,16 +142,48 @@ class ProfilePayload:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary matching the JSON contract."""
+        # Normalize statistical summary to list form
+        stat = self.statistical_summary
+        if isinstance(stat, dict):
+            # convert dict-of-columns to list
+            try:
+                stat_list = [v for _, v in stat.items()]
+            except Exception:
+                stat_list = []
+        else:
+            stat_list = stat or []
+
+        # Normalize value distributions to list of {column, histogram}
+        vd = self.value_distributions
+        vd_list: List[Dict[str, Any]]
+        if isinstance(vd, dict):
+            vd_list = [
+                {"column": k, "histogram": (v[: self.MAX_DISTRIBUTION_ITEMS] if isinstance(v, list) else [])}
+                for k, v in vd.items()
+            ]
+        elif isinstance(vd, list):
+            # Ensure each histogram array is trimmed
+            vd_list = []
+            for item in vd:
+                if not isinstance(item, dict):
+                    continue
+                col = item.get("column")
+                hist = item.get("histogram") or item.get("distribution") or []
+                if isinstance(hist, list):
+                    hist = hist[: self.MAX_DISTRIBUTION_ITEMS]
+                else:
+                    hist = []
+                vd_list.append({"column": col, "histogram": hist})
+        else:
+            vd_list = []
+
         result: Dict[str, Any] = {
-            "statisticalSummary": self.statistical_summary,
+            "statisticalSummary": stat_list,
             "completenessOverview": self.completeness_overview,
-            "typeFormatIssues": self.type_format_issues[:self.MAX_ANOMALY_EXAMPLES],
+            "typeFormatIssues": self.type_format_issues[: self.MAX_ANOMALY_EXAMPLES],
             "uniquenessOverview": self.uniqueness_overview,
-            "valueDistributions": {
-                k: v[:self.MAX_DISTRIBUTION_ITEMS]
-                for k, v in self.value_distributions.items()
-            },
-            "boundsAnomalies": self.bounds_anomalies[:self.MAX_ANOMALY_EXAMPLES],
+            "valueDistributions": vd_list,
+            "boundsAnomalies": self.bounds_anomalies[: self.MAX_ANOMALY_EXAMPLES],
         }
         if self.sample_data:
             result["sampleData"] = {
