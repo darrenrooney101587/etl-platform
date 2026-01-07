@@ -38,6 +38,7 @@ class MonitoringFile:
     agency_slug: str
     latest_data_quality_score: Optional[int] = None
     schema_definition_id: Optional[int] = None
+    schema_definition_version_id: Optional[int] = None
     schema_definition: Optional[MonitoringFileSchemaDefinition] = None
     is_suppressed: bool = False
 

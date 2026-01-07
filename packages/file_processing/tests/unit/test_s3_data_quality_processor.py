@@ -47,12 +47,15 @@ class FakeMonitoringRepository:
         agency_slug: str,
         file_name: str,
         schema_definition_id: Optional[int] = None,
+        schema_definition_version_id: Optional[int] = None,
+        s3_url: Optional[str] = None,
     ) -> MonitoringFile:
         mf = MonitoringFile(
             id=self._next_id,
             file_name=file_name,
             agency_slug=agency_slug,
             schema_definition_id=schema_definition_id,
+            schema_definition_version_id=schema_definition_version_id,
         )
         self._next_id += 1
         self.monitoring_files[f"{agency_slug}/{file_name}"] = mf
@@ -67,8 +70,19 @@ class FakeMonitoringRepository:
                 break
 
     def get_schema_definition(
-        self, schema_definition_id: int
+        self, schema_definition_id: int, schema_definition_version_id: Optional[int] = None
     ) -> Optional[MonitoringFileSchemaDefinition]:
+        # Record the call so tests can assert the repository was asked for the
+        # correct schema definition and version.
+        self._last_get_schema_call = (schema_definition_id, schema_definition_version_id)
+
+        # If a specific version id was requested and we have a versioned mapping
+        # keyed by (definition_id, version_id), return that; otherwise fall back
+        # to the base schema_definition mapping.
+        key = (schema_definition_id, schema_definition_version_id)
+        if key in getattr(self, "_versioned_schema_definitions", {}):
+            return self._versioned_schema_definitions[key]
+
         return self.schema_definitions.get(schema_definition_id)
 
     def get_or_create_run(
@@ -318,6 +332,42 @@ class S3DataQualityProcessorS3EventTest(unittest.TestCase):
 
         # Check that score was updated on monitoring file
         self.assertEqual(mf.latest_data_quality_score, result.score)
+
+    def test_processor_uses_pinned_schema_version(self) -> None:
+        """Ensure the processor requests the pinned schema_definition_version_id when present."""
+        repo = FakeMonitoringRepository()
+
+        # Create a monitoring file with both definition id and pinned version id
+        mf = MonitoringFile(
+            id=1,
+            file_name="test-file",
+            agency_slug="test-agency",
+            schema_definition_id=42,
+            schema_definition_version_id=9001,
+        )
+        repo.monitoring_files["test-agency/test-file"] = mf
+
+        # Provide a base schema definition and a versioned definition mapping
+        base_def = MonitoringFileSchemaDefinition(id=42, name="base", definition={})
+        version_def = MonitoringFileSchemaDefinition(id=9001, name="v9001", definition={"versioned": True})
+        repo.schema_definitions[42] = base_def
+        repo._versioned_schema_definitions = {(42, 9001): version_def}
+
+        mock_s3_client = MagicMock()
+        mock_s3_client.s3_client.get_object.return_value = {
+            "Body": MagicMock(read=lambda: b"id,name\n1,Alice")
+        }
+
+        processor = S3DataQualityProcessor(repository=repo, s3_client=mock_s3_client)
+
+        event = S3Event(bucket="ignored", key="agency/test-agency/files/test-file/2026-01-04/12/data.csv")
+
+        result = processor.process_s3_event(event)
+
+        # Assert the repository was asked for the specific version
+        self.assertEqual(getattr(repo, "_last_get_schema_call", None), (42, 9001))
+        # And processing completed
+        self.assertTrue(result.passed)
 
 
 if __name__ == "__main__":

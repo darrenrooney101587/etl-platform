@@ -230,7 +230,8 @@ class S3DataQualityProcessor:
         schema_definition: Dict[str, Any] = {}
         if monitoring_file.schema_definition_id:
             schema_def = self._repository.get_schema_definition(
-                monitoring_file.schema_definition_id
+                monitoring_file.schema_definition_id,
+                monitoring_file.schema_definition_version_id,
             )
             if schema_def:
                 schema_definition = schema_def.definition

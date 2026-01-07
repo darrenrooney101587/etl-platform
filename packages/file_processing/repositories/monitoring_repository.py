@@ -105,6 +105,7 @@ class MonitoringRepository:
                     mf.agency_slug,
                     mf.latest_data_quality_score,
                     mf.schema_definition_id,
+                    mf.schema_definition_version_id,
                     mf.s3_url,
                     mf.is_suppressed
                 FROM reporting.monitoring_file mf
@@ -120,6 +121,7 @@ class MonitoringRepository:
                     mf.agency_slug,
                     mf.latest_data_quality_score,
                     mf.schema_definition_id,
+                    mf.schema_definition_version_id,
                     mf.s3_url,
                     mf.is_suppressed
                 FROM reporting.monitoring_file mf
@@ -140,6 +142,7 @@ class MonitoringRepository:
                         mf.agency_slug,
                         mf.latest_data_quality_score,
                         mf.schema_definition_id,
+                        mf.schema_definition_version_id,
                         mf.s3_url,
                         mf.is_suppressed
                     FROM reporting.monitoring_file mf
@@ -161,6 +164,7 @@ class MonitoringRepository:
                         mf.agency_slug,
                         mf.latest_data_quality_score,
                         mf.schema_definition_id,
+                        mf.schema_definition_version_id,
                         mf.s3_url,
                         mf.is_suppressed
                     FROM reporting.monitoring_file mf
@@ -186,6 +190,7 @@ class MonitoringRepository:
                         agency_slug=row["agency_slug"],
                         latest_data_quality_score=row.get("latest_data_quality_score"),
                         schema_definition_id=row.get("schema_definition_id"),
+                        schema_definition_version_id=row.get("schema_definition_version_id"),
                         is_suppressed=row.get("is_suppressed", False),
                     )
             except Exception:
@@ -207,6 +212,7 @@ class MonitoringRepository:
             agency_slug=row["agency_slug"],
             latest_data_quality_score=row.get("latest_data_quality_score"),
             schema_definition_id=row.get("schema_definition_id"),
+            schema_definition_version_id=row.get("schema_definition_version_id"),
             is_suppressed=row.get("is_suppressed", False),
         )
 
@@ -225,7 +231,8 @@ class MonitoringRepository:
                 mf.file_name,
                 mf.agency_slug,
                 mf.latest_data_quality_score,
-                mf.schema_definition_id
+                mf.schema_definition_id,
+                mf.schema_definition_version_id
             FROM reporting.monitoring_file mf
             WHERE mf.id = %s
         """
@@ -241,6 +248,7 @@ class MonitoringRepository:
             agency_slug=row["agency_slug"],
             latest_data_quality_score=row.get("latest_data_quality_score"),
             schema_definition_id=row.get("schema_definition_id"),
+            schema_definition_version_id=row.get("schema_definition_version_id"),
         )
 
     def _get_required_columns_with_no_default(
@@ -281,6 +289,7 @@ class MonitoringRepository:
         agency_slug: str,
         file_name: str,
         schema_definition_id: Optional[int] = None,
+        schema_definition_version_id: Optional[int] = None,
         s3_url: Optional[str] = None,
     ) -> MonitoringFile:
         """Create a new monitoring file record.
@@ -289,6 +298,7 @@ class MonitoringRepository:
             agency_slug: The agency slug identifier.
             file_name: The file name identifier.
             schema_definition_id: Optional schema definition FK.
+            schema_definition_version_id: Optional schema version ID FK to pin specific version.
             s3_url: Optional S3 URL or path for the file (populates not-null s3_url column if required).
 
         Returns:
@@ -300,6 +310,7 @@ class MonitoringRepository:
             "agency_slug": agency_slug,
             "file_name": file_name,
             "schema_definition_id": schema_definition_id,
+            "schema_definition_version_id": schema_definition_version_id,
         }
 
         # Discover additional NOT NULL columns without default and populate placeholders
@@ -313,13 +324,23 @@ class MonitoringRepository:
             # if timestamp/date and default is None, use SQL NOW() by marking special
             base_cols[col] = default
 
+        # TODO: REVIEW AUTOMATIC CREATION
+        # This method currently auto-creates a monitoring_file row when none exists.
+        # When we migrate the full file monitoring service into this repository,
+        # we should re-evaluate whether this repository should be responsible for
+        # creating monitoring_file records. In production the monitoring_file
+        # records are expected to be provisioned by an upstream system; auto-creating
+        # here is a convenience for local/dev/test workflows but can mask missing
+        # provisioning in production. Consider gating this behavior behind an
+        # explicit "create_if_missing" flag or removing it entirely during migration.
+
         # Build parametrized insert dynamically
         cols = ", ".join(base_cols.keys())
         placeholders = ", ".join(["%s"] * len(base_cols))
         sql = f"""
             INSERT INTO reporting.monitoring_file ({cols})
             VALUES ({placeholders})
-            RETURNING id, file_name, agency_slug, latest_data_quality_score, schema_definition_id
+            RETURNING id, file_name, agency_slug, latest_data_quality_score, schema_definition_id, schema_definition_version_id
         """
         params = []
         for k in base_cols.keys():
@@ -333,7 +354,7 @@ class MonitoringRepository:
         if not row.get("id"):
             logger.warning("INSERT into reporting.monitoring_file did not return an id; falling back to SELECT lookup")
             lookup_rows = self._db.execute_query(
-                "SELECT id, file_name, agency_slug, latest_data_quality_score, schema_definition_id "
+                "SELECT id, file_name, agency_slug, latest_data_quality_score, schema_definition_id, schema_definition_version_id "
                 "FROM reporting.monitoring_file WHERE agency_slug = %s AND file_name = %s ORDER BY id DESC LIMIT 1",
                 [agency_slug, file_name],
             )
@@ -346,6 +367,8 @@ class MonitoringRepository:
             agency_slug=row["agency_slug"],
             latest_data_quality_score=row.get("latest_data_quality_score"),
             schema_definition_id=row.get("schema_definition_id"),
+            schema_definition_version_id=row.get("schema_definition_version_id"),
+            is_suppressed=row.get("is_suppressed", False),
         )
 
     def update_monitoring_file_score(
@@ -373,27 +396,48 @@ class MonitoringRepository:
     def get_schema_definition(
         self,
         schema_definition_id: int,
+        schema_definition_version_id: Optional[int] = None,
     ) -> Optional[MonitoringFileSchemaDefinition]:
         """Look up a schema definition by ID.
 
         Args:
             schema_definition_id: The schema definition ID.
+            schema_definition_version_id: Optional specific version ID (FK). If None, retrieves the parent definition (latest active).
 
         Returns:
             MonitoringFileSchemaDefinition if found, None otherwise.
         """
-        sql = """
-            SELECT
-                id,
-                name,
-                description,
-                definition,
-                created_at,
-                updated_at
-            FROM reporting.monitoring_file_schema_definition
-            WHERE id = %s
-        """
-        rows = self._db.execute_query(sql, [schema_definition_id])
+        if schema_definition_version_id is not None:
+            # Retrieve specific version definition by the version table primary key (or composite)
+            # Since 'schema_definition_version_id' usually refers to the PK of schema_definition_version:
+            sql = """
+                SELECT
+                    v.id,
+                    d.name,
+                    d.description,
+                    v.definition,
+                    v.created_at,
+                    v.updated_at
+                FROM reporting.monitoring_file_schema_definition_version v
+                JOIN reporting.monitoring_file_schema_definition d ON d.id = v.schema_definition_id
+                WHERE v.schema_definition_id = %s
+                  AND v.id = %s
+            """
+            rows = self._db.execute_query(sql, [schema_definition_id, schema_definition_version_id])
+        else:
+            # Retrieve default/latest definition from parent table
+            sql = """
+                SELECT
+                    id,
+                    name,
+                    description,
+                    definition,
+                    created_at,
+                    updated_at
+                FROM reporting.monitoring_file_schema_definition
+                WHERE id = %s
+            """
+            rows = self._db.execute_query(sql, [schema_definition_id])
 
         if not rows:
             return None

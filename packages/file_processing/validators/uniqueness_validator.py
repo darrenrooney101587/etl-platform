@@ -72,20 +72,52 @@ class UniquenessValidator(BaseValidator):
         total_checks = 0
         total_duplicates = 0
 
+        # Build a map of required flags for schema columns so we know when missing keys
+        # are a hard failure (schema required=True).
+        required_map: Dict[str, bool] = {}
+        for col_def in schema_definition.get("columns", []):
+            name = col_def.get("name")
+            if name:
+                required_map[name] = bool(col_def.get("required", False))
+
         for key_cols in unique_keys:
             result = self._check_uniqueness(rows, key_cols)
-            total_checks += len(rows)
-            total_duplicates += result["duplicate_count"]
+            # total_checks includes both rows with keys and rows missing keys (we treat missing as checks)
+            total_checks += result.get("total_count", 0) + result.get("missing_key_count", 0)
 
-            if result["duplicate_count"] > 0:
+            # By default, count duplicates found among present keys
+            total_duplicates += result.get("duplicate_count", 0)
+
+            # If any key component is required in the schema and there were missing keys,
+            # count those missing rows as failures as well and mark as a failure
+            missing = result.get("missing_key_count", 0)
+            required_missing = False
+            if missing > 0:
+                for c in key_cols:
+                    if required_map.get(c, False):
+                        required_missing = True
+                        break
+                if required_missing:
+                    # Treat missing required keys as failures
+                    total_duplicates += missing
+
+            if result.get("duplicate_count", 0) > 0 or required_missing:
+                msg_parts = []
+                if result.get("duplicate_count", 0) > 0:
+                    msg_parts.append(f"{result.get('duplicate_count')} duplicate entries")
+                if required_missing:
+                    msg_parts.append(f"{missing} missing required key rows")
+
                 failures.append({
                     "check": "uniqueness",
                     "columns": key_cols,
-                    "unique_count": result["unique_count"],
-                    "duplicate_count": result["duplicate_count"],
-                    "uniqueness_ratio": result["uniqueness_ratio"],
-                    "sample_duplicates": result["sample_duplicates"][:10],
-                    "message": f"Key {key_cols} has {result['duplicate_count']} duplicate entries ({result['uniqueness_ratio']*100:.1f}% unique)",
+                    "unique_count": result.get("unique_count"),
+                    "duplicate_count": result.get("duplicate_count"),
+                    "uniqueness_ratio": result.get("uniqueness_ratio"),
+                    "sample_duplicates": result.get("sample_duplicates")[:10],
+                    "missing_key_count": missing,
+                    "required_missing": required_missing,
+                    "message": f"Key {key_cols} has: {', '.join(msg_parts)}",
                 })
 
         passed = total_duplicates == 0
@@ -167,11 +199,26 @@ class UniquenessValidator(BaseValidator):
         Returns:
             Dictionary with uniqueness statistics.
         """
-        # Build composite keys
+        # Build composite keys, but skip rows where any key component is null/blank
+        def _is_null(val: Any) -> bool:
+            if val is None:
+                return True
+            if isinstance(val, str):
+                s = val.strip()
+                if s == "":
+                    return True
+                if s.lower() == "null":
+                    return True
+            return False
+
         keys: List[Tuple[Any, ...]] = []
+        missing_key_count = 0
         for row in rows:
-            key = tuple(row.get(col) for col in key_cols)
-            keys.append(key)
+            key_components = [row.get(col) for col in key_cols]
+            if any(_is_null(c) for c in key_components):
+                missing_key_count += 1
+                continue
+            keys.append(tuple(key_components))
 
         # Count occurrences
         counter = Counter(keys)
@@ -198,4 +245,5 @@ class UniquenessValidator(BaseValidator):
             "duplicate_count": duplicate_count,
             "uniqueness_ratio": round(uniqueness_ratio, 4),
             "sample_duplicates": sample_duplicates,
+            "missing_key_count": missing_key_count,
         }
