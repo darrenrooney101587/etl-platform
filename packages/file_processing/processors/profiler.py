@@ -405,31 +405,9 @@ class DataProfiler:
                 "columns": [],
             }
 
-        # Identify "Identity" columns to exclude from duplicate row detection.
-        # Business duplicates should be counted based on data columns, ignoring technical IDs.
-        identity_cols: set[str] = set()
-
-        if schema_definition:
-            for col_def in schema_definition.get("columns", []):
-                name = col_def.get("name")
-                if not name:
-                    continue
-                # Criteria for identity column:
-                # 1. explicitly marked as identity
-                is_identity = col_def.get("identity", False)
-
-                if is_identity:
-                    identity_cols.add(name)
-
-        # Determine data columns (all columns minus identity columns)
-        # If all columns are identity columns (edge case), fall back to using all columns
-        # to avoid empty tuple uniqueness checking (which would flag 100% duplicates).
-        data_cols = [c for c in columns if c not in identity_cols]
-        if not data_cols:
-            data_cols = columns
-
-        # Check for row duplicates based on data columns
-        row_tuples = [tuple(row.get(col) for col in data_cols) for row in rows]
+        # Check for row duplicates based on all columns
+        # Treat all columns as data columns since 'identity' concept is removed
+        row_tuples = [tuple(row.get(col) for col in columns) for row in rows]
         unique_rows_set = set(row_tuples)
         unique_rows_count = len(unique_rows_set)
         duplicate_rows = total_rows - unique_rows_count

@@ -1,4 +1,5 @@
 """Unit tests for S3DataQualityProcessor."""
+import io
 import unittest
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -270,7 +271,7 @@ class S3DataQualityProcessorS3EventTest(unittest.TestCase):
         # Create a mock S3 client that returns CSV data
         mock_s3_client = MagicMock()
         mock_s3_client.s3_client.get_object.return_value = {
-            "Body": MagicMock(read=lambda: b"id,name\n1,Alice")
+            "Body": io.BytesIO(b"id,name\n1,Alice")
         }
 
         processor = S3DataQualityProcessor(
@@ -312,7 +313,7 @@ class S3DataQualityProcessorS3EventTest(unittest.TestCase):
 
         mock_s3_client = MagicMock()
         mock_s3_client.s3_client.get_object.return_value = {
-            "Body": MagicMock(read=lambda: b"id,name\n1,Alice")
+            "Body": io.BytesIO(b"id,name\n1,Alice")
         }
 
         processor = S3DataQualityProcessor(repository=repo, s3_client=mock_s3_client)
@@ -355,7 +356,7 @@ class S3DataQualityProcessorS3EventTest(unittest.TestCase):
 
         mock_s3_client = MagicMock()
         mock_s3_client.s3_client.get_object.return_value = {
-            "Body": MagicMock(read=lambda: b"id,name\n1,Alice")
+            "Body": io.BytesIO(b"id,name\n1,Alice")
         }
 
         processor = S3DataQualityProcessor(repository=repo, s3_client=mock_s3_client)
