@@ -1,0 +1,42 @@
+{
+    "columns": [
+        {
+            "name": "id",
+            "type": "integer",
+            "required": true
+        },
+        {
+            "name": "full_name",
+            "type": "string",
+            "required": true
+        },
+        {
+            "name": "age",
+            "type": "integer",
+            "required": true,
+            "min": 18,
+            "max": 100
+        },
+        {
+            "name": "salary",
+            "type": "integer",
+            "required": true
+        },
+        {
+            "name": "email",
+            "type": "string",
+            "required": true,
+            "unique": true
+        },
+        {
+            "name": "department",
+            "type": "string",
+            "required": false
+        },
+        {
+            "name": "start_date",
+            "type": "date",
+            "required": true
+        }
+    ]
+}

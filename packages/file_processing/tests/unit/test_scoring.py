@@ -135,5 +135,44 @@ class DataQualityMetricsTest(unittest.TestCase):
         self.assertEqual(result["completeness"]["details"], "3% nulls")
 
 
+class SampleDataTest(unittest.TestCase):
+    """Tests for SampleData."""
+
+    def test_to_dict(self) -> None:
+        from file_processing.models.quality import SampleData
+
+        sd = SampleData(columns=["a", "b"], rows=[[1, 2], [3, 4]])
+        d = sd.to_dict()
+        self.assertEqual(d["columns"], ["a", "b"])
+        self.assertEqual(len(d["rows"]), 2)
+        self.assertEqual(d["rows"][0], [1, 2])
+
+
+class FullDataQualityResultTest(unittest.TestCase):
+    """Tests for DataQualityResult serialization."""
+
+    def test_to_dict(self) -> None:
+        deductions = DataQualityDeductions()
+        metrics = DataQualityMetrics()
+
+        res = DataQualityResult(
+            score=95,
+            passed=True,
+            metrics=metrics,
+            deductions=deductions,
+            failed_validation_message="Some error",
+            failed_validation_rules=[{"rule": "r1"}],
+        )
+
+        d = res.to_dict()
+        self.assertEqual(d["score"], 95)
+        self.assertEqual(d["passed"], True)
+        self.assertIn("metrics", d)
+        self.assertIn("deductions", d)
+        self.assertEqual(d["failed_validation_message"], "Some error")
+        self.assertEqual(d["failed_validation_rules"], [{"rule": "r1"}])
+        self.assertIsNone(d["profile"])
+
+
 if __name__ == "__main__":
     unittest.main()

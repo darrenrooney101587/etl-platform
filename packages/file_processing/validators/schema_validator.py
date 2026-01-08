@@ -67,7 +67,6 @@ class SchemaValidator(BaseValidator):
                 details="No columns defined in schema; skipping schema validation",
             )
 
-        strict_mode = schema_definition.get("strict", False)
 
         # Build mapping from schema names to actual column names
         # This handles case-insensitivity and regex patterns
@@ -91,16 +90,6 @@ class SchemaValidator(BaseValidator):
                         "message": f"Required column '{col_name}' is missing",
                     })
 
-        # Check for unexpected columns in strict mode
-        if strict_mode:
-            for col in columns:
-                total_checks += 1
-                if col not in mapped_actual_columns:
-                    failures.append({
-                        "check": "unexpected_column",
-                        "column": col,
-                        "message": f"Unexpected column '{col}' not in schema",
-                    })
 
         # Type validation on sample of rows (first 100)
         sample_rows = rows[:100]
@@ -124,7 +113,6 @@ class SchemaValidator(BaseValidator):
             metadata={
                 "expected_columns": len(expected_columns),
                 "actual_columns": len(columns),
-                "strict_mode": strict_mode,
             },
         )
 

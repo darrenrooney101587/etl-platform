@@ -137,10 +137,10 @@ class CompletenessValidator(BaseValidator):
         for col_def in column_defs:
             col_name = col_def.get("name", "")
             is_required = col_def.get("required", False)
-            is_nullable = col_def.get("nullable", True)
+            # is_nullable = col_def.get("nullable", True) # Ignore nullable default for now
 
-            # Column is required if marked required and not nullable
-            if is_required and not is_nullable and col_name in columns:
+            # Column is required if explicitly marked required
+            if is_required and col_name in columns:
                 required.append(col_name)
 
         return required

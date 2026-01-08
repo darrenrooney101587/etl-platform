@@ -174,11 +174,10 @@ class UniquenessValidator(BaseValidator):
         column_defs = schema_definition.get("columns", [])
         for col_def in column_defs:
             col_name = col_def.get("name", "")
-            # Check both strict 'unique' constraint and 'primary_key' definition
+            # Check strict 'unique' constraint
             is_unique = col_def.get("unique", False)
-            is_pk = col_def.get("primary_key", False) or col_def.get("is_primary_key", False)
 
-            if (is_unique or is_pk) and col_name in columns:
+            if is_unique and col_name in columns:
                 # Avoid duplicates
                 if [col_name] not in unique_keys:
                     unique_keys.append([col_name])

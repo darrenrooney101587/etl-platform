@@ -96,6 +96,10 @@ class DataProfiler:
     ) -> List[Dict[str, Any]]:
         """Compute statistical summary for numeric columns.
 
+        Only computes statistics if:
+        1. The schema explicitly defines the column as numeric (int, float, etc.), OR
+        2. No schema type is defined, but >80% of non-null values are numeric.
+
         Args:
             rows: Data rows.
             columns: Column names.
@@ -108,71 +112,99 @@ class DataProfiler:
 
         summary: List[Dict[str, Any]] = []
 
+        # Pre-fetch column types if schema is available
+        col_types = {}
+        if schema_definition:
+            for col_def in schema_definition.get("columns", []):
+                if "name" in col_def and "type" in col_def:
+                    col_types[col_def["name"]] = col_def["type"].lower()
+
+        numeric_type_aliases = (
+            "integer", "int", "int4", "int8", "bigint",
+            "float", "number", "decimal", "double", "real", "numeric"
+        )
+
         for col in columns:
-            # Collect non-null values for this column
-            non_null_vals = [row.get(col) for row in rows if not self._is_null(row.get(col))]
+             # 1. Check schema if available
+             defined_type = col_types.get(col)
+             if defined_type:
+                 # If schema says strict string/bool/date, skip stats
+                 if defined_type not in numeric_type_aliases:
+                     continue
 
-            # Convert to numeric values
-            numeric_values: List[float] = []
-            for v in non_null_vals:
-                try:
-                    if isinstance(v, (int, float)) and not isinstance(v, bool):
-                        numeric_values.append(float(v))
-                    elif isinstance(v, str):
-                        numeric_values.append(float(v))
-                except (ValueError, TypeError):
-                    pass
+             # Collect non-null values for this column
+             non_null_vals = [row.get(col) for row in rows if not self._is_null(row.get(col))]
 
-            if not numeric_values:
-                continue
+             if not non_null_vals:
+                 continue
 
-            count = len(numeric_values)
-            min_val = min(numeric_values)
-            max_val = max(numeric_values)
-            mean_val = statistics.mean(numeric_values)
-            median_val = statistics.median(numeric_values)
-            std_dev = statistics.stdev(numeric_values) if count > 1 else 0.0
+             # Convert to numeric values
+             numeric_values: List[float] = []
+             for v in non_null_vals:
+                 try:
+                     if isinstance(v, (int, float)) and not isinstance(v, bool):
+                         numeric_values.append(float(v))
+                     elif isinstance(v, str):
+                         numeric_values.append(float(v))
+                 except (ValueError, TypeError):
+                     pass
 
-            zeros = sum(1 for x in numeric_values if x == 0)
-            negatives = sum(1 for x in numeric_values if x < 0)
+             if not numeric_values:
+                 continue
 
-            # IQR and Outliers
-            numeric_values_sorted = sorted(numeric_values)
-            q1 = numeric_values_sorted[int(count * 0.25)]
-            q3 = numeric_values_sorted[int(count * 0.75)]
-            iqr = q3 - q1
-            lower_bound = q1 - 1.5 * iqr
-            upper_bound = q3 + 1.5 * iqr
+             # 2. Heuristic: if no schema enforced, ensure > 80% of data is numeric
+             # to avoid generating stats for string columns with occasional dirty numbers.
+             if not defined_type:
+                 numeric_ratio = len(numeric_values) / len(non_null_vals)
+                 if numeric_ratio < 0.8:
+                     continue
 
-            outliers = [x for x in numeric_values if x < lower_bound or x > upper_bound]
-            outlier_count = len(outliers)
-            # Sample up to 10 outliers
-            outlier_values = outliers[:10]
+             count = len(numeric_values)
+             min_val = min(numeric_values)
+             max_val = max(numeric_values)
+             mean_val = statistics.mean(numeric_values)
+             median_val = statistics.median(numeric_values)
+             std_dev = statistics.stdev(numeric_values) if count > 1 else 0.0
 
-            # Simple distribution heuristic
-            distribution = "unknown"
-            if abs(mean_val - median_val) < (iqr * 0.1) if iqr > 0 else True:
-                distribution = "normal"
-            elif mean_val > median_val:
-                distribution = "skewed-right"
-            else:
-                distribution = "skewed-left"
+             zeros = sum(1 for x in numeric_values if x == 0)
+             negatives = sum(1 for x in numeric_values if x < 0)
 
-            summary.append({
-                "column": col,
-                "mean": round(mean_val, 2),
-                "median": round(median_val, 2),
-                "stdDev": round(std_dev, 2),
-                "min": min_val,
-                "max": max_val,
-                "count": count,
-                "zeros": zeros,
-                "negatives": negatives,
-                "iqr": round(iqr, 2),
-                "distribution": distribution,
-                "outlierCount": outlier_count,
-                "outlierValues": outlier_values,
-            })
+             # Outliers
+             numeric_values_sorted = sorted(numeric_values)
+             q1 = numeric_values_sorted[int(count * 0.25)]
+             q3 = numeric_values_sorted[int(count * 0.75)]
+             iqr = q3 - q1
+             lower_bound = q1 - 1.5 * iqr
+             upper_bound = q3 + 1.5 * iqr
+
+             outliers = [x for x in numeric_values if x < lower_bound or x > upper_bound]
+             outlier_count = len(outliers)
+             # Sample up to 10 outliers
+             outlier_values = outliers[:10]
+
+             # Simple distribution heuristic
+             distribution = "unknown"
+             if abs(mean_val - median_val) < (iqr * 0.1) if iqr > 0 else True:
+                 distribution = "normal"
+             elif mean_val > median_val:
+                 distribution = "skewed-right"
+             else:
+                 distribution = "skewed-left"
+
+             summary.append({
+                 "column": col,
+                 "mean": round(mean_val, 2),
+                 "median": round(median_val, 2),
+                 "stdDev": round(std_dev, 2),
+                 "min": min_val,
+                 "max": max_val,
+                 "count": count,
+                 "zeros": zeros,
+                 "negatives": negatives,
+                 "distribution": distribution,
+                 "outlierCount": outlier_count,
+                 "outlierValues": outlier_values,
+             })
 
         return summary
 
@@ -309,12 +341,12 @@ class DataProfiler:
 
     def _value_matches_type(self, value: Any, expected_type: str) -> Tuple[bool, Optional[str]]:
         """Check if value matches expected type and return reason if not."""
-        if expected_type in ("string", "str", "text"):
+        if expected_type in ("string", "str", "text", "varchar"):
             if isinstance(value, str):
                 return True, None
             return False, f"Expected string, got {type(value).__name__}"
 
-        if expected_type in ("integer", "int"):
+        if expected_type in ("integer", "int", "int4", "int8", "bigint"):
             if isinstance(value, bool):
                 return False, "Boolean value not allowed for integer"
             if isinstance(value, int):
@@ -327,7 +359,7 @@ class DataProfiler:
                     return False, f"String '{value}' cannot be parsed as integer"
             return False, f"Expected integer, got {type(value).__name__}"
 
-        if expected_type in ("float", "number", "decimal"):
+        if expected_type in ("float", "number", "decimal", "double", "real", "numeric"):
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 return True, None
             if isinstance(value, str):
@@ -338,7 +370,7 @@ class DataProfiler:
                     return False, f"String '{value}' cannot be parsed as float"
             return False, f"Expected number, got {type(value).__name__}"
 
-        if expected_type in ("boolean", "bool"):
+        if expected_type in ("boolean", "bool", "bit"):
             if isinstance(value, bool):
                 return True, None
             if isinstance(value, str) and value.lower() in ("true", "false", "1", "0"):
@@ -383,12 +415,10 @@ class DataProfiler:
                 if not name:
                     continue
                 # Criteria for identity column:
-                # 1. explicitly marked as primary_key
-                # 2. explicitly marked as identity
-                is_pk = col_def.get("primary_key", False)
+                # 1. explicitly marked as identity
                 is_identity = col_def.get("identity", False)
 
-                if is_pk or is_identity:
+                if is_identity:
                     identity_cols.add(name)
 
         # Determine data columns (all columns minus identity columns)

@@ -77,6 +77,15 @@ file-processing run s3_data_quality_job --events-file events.json
 file-processing run s3_data_quality_job --bucket my-bucket --key path/to/file.csv -v
 ```
 
+## SQS Consumer
+
+The package includes a long-polling SQS consumer that forwards messages to the `s3_data_quality_job`.
+
+```bash
+# Run the SQS consumer (requires SQS_QUEUE_URL env var)
+file-processing-sqs
+```
+
 ## S3 Key Format
 
 The pipeline expects S3 keys in the following format:
@@ -113,6 +122,13 @@ Deductions are proportional based on failure ratio:
 
 **Pass threshold**: score >= 80
 
+### Uniqueness Validation
+
+Uniqueness checks are performed based on the pinned schema version.
+- **Nulls ignored**: Values considered null (`None`, empty string, `"null"`) are ignored during uniqueness checks.
+- **Required keys**: If a unique key column is marked `required: true` in the schema, missing values count as failures.
+- **Business Duplicates**: The profiling step calculates "duplicate rows" by effectively ignoring columns marked as `primary_key` or `identity` in the schema. This ensures technical IDs do not mask duplication in business data.
+
 ### Proportional Deductions
 
 Deductions are calculated proportionally. For example, if 1 of 5 schema fields fails:
@@ -137,6 +153,21 @@ Schema definitions are stored in `reporting.monitoring_file_schema_definition` a
 ```
 
 Supported types: `string`, `integer`, `float`, `boolean`, `date`, `datetime`
+
+## Data Profiling Logic
+
+The profiler generates statistical summaries for each column to support analyst exploration.
+
+### How columns are classified
+
+Each column produces a single profiling entry. The set of metrics shown for a column depends on how the column is classified: schema-defined numeric columns receive numeric statistics (mean, median, stdDev, min, max, IQR, outliers, etc.); non-numeric columns receive categorical metrics (unique counts, cardinality, duplicates, and value histograms).
+
+**Classification rules:**
+
+1.  **Schema precedence**: If the file’s pinned schema explicitly marks the column numeric (for example: `integer`, `bigint`, `float`, `numeric`, `decimal`), the profiler treats it as numeric.
+2.  **Heuristic fallback**: When no schema type is provided, the profiler attempts to coerce non‑null values to numbers and classifies the column as numeric only when at least **80%** of non‑null values parse as numbers; otherwise it is treated as categorical.
+
+**Example**: For a free‑text field like `first_name`, a single row with value `12345` will not turn the column numeric: if the schema marks `first_name` as string it stays categorical, and if there are many names with only one numeric-looking value the numeric coercion rate will be below 80%, so the column remains categorical.
 
 ## Database Tables
 
@@ -166,6 +197,7 @@ Environment variables:
 | `AWS_ACCESS_KEY_ID` | AWS access key (optional for IAM) | - |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key (optional for IAM) | - |
 | `AWS_REGION` | AWS region | `us-gov-west-1` |
+| `SQS_QUEUE_URL` | SQS Queue URL for `file-processing-sqs` consumer | - |
 | `S3_SOURCE_BUCKET` | Source bucket for S3 operations | - |
 | `S3_DESTINATION_BUCKET` | Destination bucket | - |
 
