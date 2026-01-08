@@ -39,9 +39,9 @@ class CsvParser(BaseParser):
             ParseResult with parsed data or error information.
         """
         try:
-            # Decode bytes to text
-            text_content = file_obj.read().decode(self._encoding)
-            text_io = io.StringIO(text_content)
+            # Wrap binary stream with TextIOWrapper for streaming decode
+            # newline="" determines how newlines are handled (universal newlines)
+            text_io = io.TextIOWrapper(file_obj, encoding=self._encoding, newline="")
 
             # Use csv.DictReader for header-based parsing
             reader = csv.DictReader(text_io, delimiter=self._delimiter)

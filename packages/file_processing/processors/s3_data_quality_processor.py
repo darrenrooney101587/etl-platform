@@ -382,8 +382,7 @@ class S3DataQualityProcessor:
                     )
 
                 with open(local_path, "rb") as f:
-                    body = f.read()
-                return parser.parse_bytes(body)
+                    return parser.parse(f)
             except Exception as exc:
                 logger.exception("Failed to read/parse local file")
                 return ParseResult(
@@ -409,8 +408,7 @@ class S3DataQualityProcessor:
                 Bucket=event.bucket,
                 Key=event.key,
             )
-            body = response["Body"].read()
-            return parser.parse_bytes(body)
+            return parser.parse(response["Body"])
         except Exception as exc:
             logger.exception("Failed to download/parse S3 object")
             return ParseResult(
