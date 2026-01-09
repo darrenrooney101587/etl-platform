@@ -142,6 +142,31 @@ resource "aws_sns_topic" "file_processing" {
   tags = local.common_tags
 }
 
+data "aws_iam_policy_document" "sns_topic_policy" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    resources = [aws_sns_topic.file_processing.arn]
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws-us-gov:s3:::${var.bucket_name}"] # hardcoded partition for now based on vars, better to use data.aws_partition
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "default" {
+  arn    = aws_sns_topic.file_processing.arn
+  policy = data.aws_iam_policy_document.sns_topic_policy.json
+}
+
 resource "aws_s3_bucket_notification" "bucket" {
   count  = var.create_s3_notifications ? 1 : 0
   bucket = var.bucket_name
@@ -150,13 +175,8 @@ resource "aws_s3_bucket_notification" "bucket" {
     topic_arn = aws_sns_topic.file_processing.arn
     events    = ["s3:ObjectCreated:*"]
   }
-}
 
-resource "aws_sns_topic_subscription" "http" {
-  count    = var.sns_endpoint_url != "" ? 1 : 0
-  topic_arn = aws_sns_topic.file_processing.arn
-  protocol  = "http"
-  endpoint  = var.sns_endpoint_url
+  depends_on = [aws_sns_topic_policy.default]
 }
 
 resource "kubernetes_namespace_v1" "ns" {
@@ -207,9 +227,12 @@ resource "kubernetes_deployment_v1" "sns_listener" {
         service_account_name = var.service_account_name
 
         container {
-          name  = "sns-listener"
-          image = var.image
-          args  = ["-m", "file_processing.cli.sns_main"]
+          name    = "sns-listener"
+          image   = var.image
+          # Override the Docker ENTRYPOINT ("python -m file_processing.cli.main")
+          # so we can invoke the sns_main module directly.
+          command = ["python"]
+          args    = ["-m", "file_processing.cli.sns_main"]
 
           port {
             name           = "http"
@@ -251,6 +274,16 @@ resource "kubernetes_service_v1" "sns_listener" {
   depends_on = [aws_eks_node_group.this]
 }
 
+resource "aws_sns_topic_subscription" "http" {
+  count     = length(var.sns_endpoint_url) > 0 ? 1 : 0
+  topic_arn = aws_sns_topic.file_processing.arn
+  protocol  = "http"
+
+  endpoint = var.sns_endpoint_url
+
+  depends_on = [aws_sns_topic_policy.default]
+}
+
 output "namespace" {
   value = var.create_namespace ? kubernetes_namespace_v1.ns[0].metadata[0].name : var.namespace
 }
@@ -265,4 +298,8 @@ output "cluster_name" {
 
 output "sns_topic_arn" {
   value = aws_sns_topic.file_processing.arn
+}
+
+output "debug_url" {
+  value = var.sns_endpoint_url
 }

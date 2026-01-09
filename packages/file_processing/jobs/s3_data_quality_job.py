@@ -1,197 +1,196 @@
-"""SNS HTTP entrypoint for file_processing.
+"""S3 Data Quality Job entrypoint.
 
-This CLI runs a simple HTTP server to receive AWS SNS notifications.
-It handles:
-1. SubscriptionConfirmation: Visits the SubscribeURL to confirm.
-2. Notification: Extracts the inner S3 event JSON from the SNS envelope's 'Message'
-   field and forwards that S3 event payload to s3_data_quality_job.
-
-Notes:
-- When S3 publishes to SNS, SNS delivers an HTTP POST containing an SNS envelope.
-  The actual S3 event JSON is in payload['Message'] (usually as a JSON string).
-- The s3_data_quality_job expects an AWS-style S3 event (with 'Records'), not the
-  outer SNS envelope.
-
-Usage:
-    python -m file_processing.cli.sns_main
-    # Listens on port 8080 by default. Set PORT env var to change.
+This job orchestrates the processing of a single S3 file for data quality checks.
+It is invoked by the SNS listener (for real-time events) or manually via CLI.
 """
-
-from __future__ import annotations
-
+import argparse
 import json
 import logging
 import os
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, Optional
-from urllib.request import urlopen
+from typing import List
+from urllib.parse import unquote_plus
 
-from file_processing.jobs.s3_data_quality_job import entrypoint
+from etl_core.database.client import DatabaseClient
+from etl_core.config.config import S3Config
+from etl_core.s3.client import S3Client
+
+from file_processing.models.events import S3Event
+from file_processing.processors.s3_data_quality_processor import (
+    S3DataQualityProcessor,
+    S3DataQualityProcessorConfig,
+)
+from file_processing.repositories.monitoring_repository import MonitoringRepository
 
 logger = logging.getLogger(__name__)
 
 
-def _json_loads_maybe(raw: Any) -> Any:
-    """Parse a JSON string if needed; otherwise return the value as-is.
+def _extract_s3_events(payload: dict) -> List[S3Event]:
+    """Extract S3Events from various trigger payloads (Direct, S3, SNS)."""
+    events = []
 
-    :param raw: Candidate JSON string or object
-    :type raw: Any
-    :returns: Parsed object or original value
-    :rtype: Any
+    # helper to process an S3-style event dict (with Records)
+    def process_s3_event_payload(payload_data):
+        if not isinstance(payload_data, dict):
+            return []
+        recs = payload_data.get("Records", [])
+        extracted = []
+        for rec in recs:
+            if "s3" in rec:
+                s3_info = rec["s3"]
+                bucket = s3_info.get("bucket", {}).get("name")
+                key = s3_info.get("object", {}).get("key")
+                if bucket and key:
+                    # S3 keys in events are URL-encoded
+                    key = unquote_plus(key)
+                    extracted.append(S3Event(bucket=bucket, key=key))
+        return extracted
+
+    # Case 1: Direct invocation payload {"bucket": "...", "key": "..."}
+    if "bucket" in payload and "key" in payload:
+        return [S3Event(bucket=payload["bucket"], key=payload["key"])]
+
+    # Case 2: Standard S3 Event or wrapper
+    records = payload.get("Records", [])
+    if records:
+        # Check if first record is SNS
+        first_rec = records[0]
+
+        # SNS Wrapping
+        if "Sns" in first_rec and "Message" in first_rec["Sns"]:
+            for rec in records:
+                if "Sns" in rec:
+                    try:
+                        message = rec["Sns"]["Message"]
+                        inner_payload = json.loads(message)
+                        events.extend(process_s3_event_payload(inner_payload))
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.warning("Failed to parse SNS message: %s", e)
+
+        # Standard S3 Event
+        elif "s3" in first_rec:
+            events.extend(process_s3_event_payload(payload))
+
+    return events
+
+
+def entrypoint(argv: List[str]) -> int:
+    """Entrypoint for the s3_data_quality_job.
+
+    Args:
+        argv: Command line arguments (excluding the script name).
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
     """
-    if isinstance(raw, str):
-        return json.loads(raw)
-    return raw
+    parser = argparse.ArgumentParser(description="Process S3 file for data quality")
 
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--event-json",
+        help="JSON string of the S3 event (AWS S3 notification format)",
+    )
+    group.add_argument(
+        "--event-file",
+        help="Path to a file containing the JSON event payload",
+    )
 
-def _extract_s3_event_from_sns_envelope(sns_payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract the S3 event JSON from an SNS HTTP envelope.
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run without persisting changes to the database",
+    )
 
-    SNS HTTP POST payload (envelope) includes:
-      - Type: "Notification"
-      - Message: "<json string of S3 event>"  OR sometimes already a dict
-    The S3 event JSON should have a top-level "Records" list.
+    # Configure basic logging to ensuring INFO logs appear on stdout
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,  # Ensure we override any existing config if this entrypoint is called
+    )
 
-    :param sns_payload: Decoded SNS envelope JSON
-    :type sns_payload: Dict[str, Any]
-    :returns: Decoded S3 event JSON dict (must include 'Records')
-    :rtype: Dict[str, Any]
-    :raises ValueError: if Message is missing/unparseable or doesn't resemble an S3 event
-    """
-    if "Message" not in sns_payload:
-        raise ValueError("SNS Notification missing 'Message' field")
-
-    message_obj = _json_loads_maybe(sns_payload["Message"])
-    if not isinstance(message_obj, dict):
-        raise ValueError(f"Unsupported SNS Message type: {type(message_obj)}")
-
-    # S3 event notifications should contain Records
-    if "Records" not in message_obj:
-        # Provide a small hint about what we saw (without dumping huge payloads)
-        keys = sorted(list(message_obj.keys()))
-        raise ValueError(f"Decoded SNS Message does not contain 'Records'. Keys={keys}")
-
-    return message_obj
-
-
-class SNSRequestHandler(BaseHTTPRequestHandler):
-    """Handles SNS HTTP requests."""
-
-    def do_GET(self) -> None:
-        """Health/simple endpoints.
-
-        - GET /healthz returns 200 OK
-        - GET / returns 200 OK
-        """
-        if self.path in ("/healthz", "/"):
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"OK")
-            return
-
-        self.send_response(404)
-        self.end_headers()
-        self.wfile.write(b"Not Found")
-
-    def do_POST(self) -> None:
-        """Handle SNS POST request."""
-        content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length).decode("utf-8")
-
-        try:
-            payload: Dict[str, Any] = json.loads(body)
-        except json.JSONDecodeError:
-            logger.warning("Invalid JSON in POST body")
-            self.send_error(400, "Invalid JSON")
-            return
-
-        msg_type = self.headers.get("x-amz-sns-message-type") or payload.get("Type")
-
-        if msg_type == "SubscriptionConfirmation":
-            self._handle_subscription(payload)
-            return
-
-        if msg_type == "Notification":
-            self._handle_notification(payload)
-            return
-
-        logger.warning("Unknown SNS message type: %s", msg_type)
-        self.send_response(200)  # Acknowledge anyway
-        self.end_headers()
-
-    def _handle_subscription(self, payload: Dict[str, Any]) -> None:
-        """Confirm the subscription by visiting SubscribeURL."""
-        subscribe_url = payload.get("SubscribeURL")
-        if not subscribe_url:
-            logger.error("SubscriptionConfirmation missing SubscribeURL")
-            self.send_error(400, "Missing SubscribeURL")
-            return
-
-        logger.info("Received SubscriptionConfirmation. Visiting URL: %s", subscribe_url)
-        try:
-            with urlopen(subscribe_url) as response:
-                if response.status == 200:
-                    logger.info("Subscription confirmed successfully.")
-                else:
-                    logger.error("Failed to confirm subscription: HTTP %s", response.status)
-        except Exception as exc:
-            logger.exception("Error visiting SubscribeURL: %s", exc)
-
-        self.send_response(200)
-        self.end_headers()
-
-    def _handle_notification(self, payload: Dict[str, Any]) -> None:
-        """Process an SNS Notification.
-
-        Extracts the inner S3 event JSON from payload['Message'] and passes that
-        to the s3_data_quality_job as --event-json.
-        """
-        logger.info("Received SNS Notification.")
-
-        try:
-            s3_event = _extract_s3_event_from_sns_envelope(payload)
-            event_json_str = json.dumps(s3_event)
-
-            # Offload job execution to a thread to avoid blocking the HTTP response
-            threading.Thread(target=self._run_job, args=(event_json_str,), daemon=True).start()
-
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"OK")
-        except Exception as exc:
-            logger.exception("Error processing SNS Notification: %s", exc)
-            self.send_error(500, str(exc))
-
-    def _run_job(self, event_json: str) -> None:
-        """Run the job entrypoint."""
-        try:
-            argv = ["--event-json", event_json]
-            logger.info("Starting job for S3 event (from SNS)")
-            ret = entrypoint(argv)
-            if ret != 0:
-                logger.error("Job failed with exit code %s", ret)
-            else:
-                logger.info("Job completed successfully")
-        except SystemExit as exc:
-            logger.error("Job raised SystemExit: %s", exc)
-        except Exception as exc:
-            logger.exception("Job crashed: %s", exc)
-
-
-def main() -> None:
-    """Start the HTTP server."""
-    port = int(os.getenv("PORT", "8080"))
-    server_address = ("", port)
-    httpd = HTTPServer(server_address, SNSRequestHandler)
-    logger.info("Starting SNS listener on port %s...", port)
     try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        logger.info("Stopping SNS listener.")
-        httpd.server_close()
+        args = parser.parse_args(argv)
+    except SystemExit:
+        # argparse calls sys.exit(), catch it to return int
+        return 2
+
+    try:
+        # Parse the AWS S3 event JSON
+        event_json_str = args.event_json
+        if args.event_file:
+            try:
+                with open(args.event_file, "r", encoding="utf-8") as f:
+                    event_json_str = f.read()
+            except IOError as e:
+                logger.error("Failed to read event file '%s': %s", args.event_file, e)
+                return 1
+
+        try:
+            event_payload = json.loads(event_json_str)
+        except json.JSONDecodeError as e:
+            logger.error("Invalid JSON provided in event payload: %s", e)
+            return 1
+
+        # Use extraction helper
+        s3_events = _extract_s3_events(event_payload)
+
+        if not s3_events:
+            # Fallback: check if we just parsed a list of records but extraction logic missed it
+            # The previous code handled logic inline; users might expect direct Records parsing
+            logger.error("No S3 events found in payload")
+            return 1
+
+        # Initialize dependencies
+        try:
+            db_client = DatabaseClient()  # Config from env vars
+            # S3Config requires bucket args even if not used by the processor which uses event.bucket
+            s3_config = S3Config(
+                source_bucket=os.getenv("S3_SOURCE_BUCKET", "ignored"),
+                destination_bucket=os.getenv("S3_DESTINATION_BUCKET", "ignored"),
+                agency_s3_slug=os.getenv("AGENCY_S3_SLUG", "ignored"),
+            )
+            s3_client = S3Client(config=s3_config)
+            repo = MonitoringRepository(db_client)
+        except Exception as e:
+            logger.exception("Failed to initialize job dependencies: %s", e)
+            return 1
+
+        # Configure processor
+        processor_config = S3DataQualityProcessorConfig(
+            dry_run=args.dry_run,
+            # Defaults for other config options
+        )
+
+        processor = S3DataQualityProcessor(
+            repository=repo,
+            s3_client=s3_client,
+            config=processor_config,
+        )
+
+        failure_count = 0
+        for i, event in enumerate(s3_events):
+            logger.info("Processing s3://%s/%s", event.bucket, event.key)
+
+            try:
+                result = processor.process_s3_event(event)
+                logger.info(
+                    "Success: %s (Quality Score: %s)",
+                    event.key,
+                    result.score if result else "N/A",
+                )
+            except Exception as e:
+                logger.exception("Failed to process object %s", event.key)
+                failure_count += 1
+
+        if failure_count > 0:
+            logger.error("Job completed with %d failure(s)", failure_count)
+            return 1
+
+        logger.info("Job completed successfully")
+        return 0
+
+    except Exception as e:
+        logger.exception("Unexpected error in main job execution: %s", e)
+        return 1
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    main()
+JOB = (entrypoint, "Process S3 file for data quality")

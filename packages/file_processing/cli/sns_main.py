@@ -25,7 +25,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
 from urllib.request import urlopen
 
-from data_pipeline.jobs.agency_data_job import entrypoint
+# Import the correct entrypoint within the file_processing package
+from file_processing.jobs.s3_data_quality_job import entrypoint
+
 
 logger = logging.getLogger(__name__)
 

@@ -9,6 +9,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)"
 STACK_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMMAND="${1:-help}"
+NAMESPACE="file-processing"
+DEPLOYMENT_NAME="file-processing-sns"
 
 function print_usage() {
   echo "Usage: $0 {init|plan|apply|destroy|update-image|outputs}"
@@ -18,7 +20,7 @@ function print_usage() {
   echo "  plan         - terraform plan"
   echo "  apply        - terraform apply -auto-approve"
   echo "  destroy      - terraform destroy -auto-approve"
-  echo "  update-image - build/push to ECR then terraform apply with the new image"
+  echo "  update-image - build/push to ECR then update the running deployment image (fast path)"
   echo "  outputs      - terraform output"
   echo ""
   echo "Prereq: foundation_network applied and its terraform.tfstate exists."
@@ -43,11 +45,12 @@ case "$COMMAND" in
     terraform init
     terraform apply -auto-approve
     ;;
-  destroy)``
+  destroy)
     terraform init
     terraform destroy -auto-approve
     ;;
   update-image)
+    # Build and push image
     terraform init
     ./scripts/ecr_put.sh
     IMAGE_URI=$(sed -n 's/container_image = "\([^"]*\)"/\1/p' container_image.txt || true)
@@ -55,7 +58,19 @@ case "$COMMAND" in
       echo "Error: could not read image URI from container_image.txt"
       exit 1
     fi
-    terraform apply -auto-approve -var="image=$IMAGE_URI"
+
+    # Fast path: if deployment exists in the cluster, patch image via kubectl (fast loop).
+    # This avoids terraform replacing the Deployment on every apply.
+    if kubectl -n "$NAMESPACE" get deployment "$DEPLOYMENT_NAME" --ignore-not-found >/dev/null 2>&1; then
+      echo "Deployment $DEPLOYMENT_NAME exists in namespace $NAMESPACE — doing fast image update via kubectl"
+
+      kubectl -n "$NAMESPACE" set image deployment/"$DEPLOYMENT_NAME" sns-listener="$IMAGE_URI"
+      echo "Waiting for rollout to complete..."
+      kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME"
+    else
+      echo "Deployment not found — running terraform apply to create resources"
+      terraform apply -auto-approve -var="image=$IMAGE_URI"
+    fi
     ;;
   outputs)
     terraform output

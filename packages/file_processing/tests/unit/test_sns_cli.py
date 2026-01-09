@@ -38,6 +38,7 @@ class SnsCliTest(unittest.TestCase):
 
         # Instantiate without calling __init__
         req = handler.__new__(handler)
+        req.request_version = "HTTP/1.1"  # Required for send_header
         req.rfile = BytesIO(json.dumps({
             "Type": "SubscriptionConfirmation",
             "SubscribeURL": "http://example.com/confirm",
@@ -64,12 +65,13 @@ class SnsCliTest(unittest.TestCase):
 
         # Instantiate without calling __init__
         req = handler.__new__(handler)
+        req.request_version = "HTTP/1.1"  # Required for send_header
 
         # Payload mimicking SNS body
         payload = {
             "Type": "Notification",
             "TopicArn": "arn:aws:sns:...",
-            "Message": '{"bucket": "b", "key": "k"}'
+            "Message": '{"Records": [{"s3": {"bucket": {"name": "b"}, "object": {"key": "k"}}}]}'
         }
 
         req.rfile = BytesIO(json.dumps(payload).encode("utf-8"))
@@ -101,8 +103,9 @@ class SnsCliTest(unittest.TestCase):
 
         self.assertIn("Records", event_json)
         self.assertEqual(len(event_json["Records"]), 1)
-        self.assertIn("Sns", event_json["Records"][0])
-        self.assertEqual(event_json["Records"][0]["Sns"], payload)
+        # The current sns_main passes the inner S3 event directly, so we check for s3 key, not Sns wrapper
+        self.assertIn("s3", event_json["Records"][0])
+        self.assertEqual(event_json["Records"][0]["s3"]["bucket"]["name"], "b")
 
 if __name__ == "__main__":
     unittest.main()
