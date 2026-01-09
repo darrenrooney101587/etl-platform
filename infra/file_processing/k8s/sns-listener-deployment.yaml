@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: file-processing
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws-us-gov:iam::270022076279:role/file-processing-service-account-role
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sns-listener
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sns-listener
+  template:
+    metadata:
+      labels:
+        app: sns-listener
+    spec:
+      serviceAccountName: file-processing
+      containers:
+        - name: sns-listener
+          image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/file-processing:latest
+          command: ["python", "-m", "file_processing.cli.sns_main"]
+          env:
+            - name: PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080

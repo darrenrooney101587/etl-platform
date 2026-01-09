@@ -4,342 +4,188 @@ Data quality validation and file processing pipeline for S3 objects.
 
 ## Overview
 
-This package provides a complete data quality pipeline that:
+`file_processing` implements the backend data-quality and profiling pipeline that:
 
-1. Consumes S3 object-created notifications
-2. Downloads and parses files (CSV, JSONL, Parquet)
-3. Validates data against schema definitions
-4. Computes quality scores with proportional deductions
-5. Generates profiling payloads
-6. Persists results to the shared PostgreSQL database
+- Accepts S3 object-created notifications (via SNS in production; a small HTTP listener is available for dev).
+- Downloads and parses files (CSV, JSONL, Parquet).
+- Validates data against pinned schema definitions.
+- Computes data-quality scores using proportional deductions.
+- Generates profiling payloads (statistical summaries, completeness, uniqueness, distributions, bounds anomalies, samples).
+- Persists results to the shared `reporting.*` Postgres schema.
 
-## Package Structure
+This package is designed to run inside EKS jobs or long-running workers that receive SNS notifications and execute the `s3_data_quality_job` logic.
 
-```
-file_processing/
-    cli/            # CLI entrypoint using centralized etl_core helpers
-    jobs/           # Job entrypoints (each exports JOB tuple)
-    models/         # Dataclass models for events, monitoring tables, quality results
-    parsers/        # Pluggable file parsers (CSV, JSONL, Parquet)
-    processors/     # Business logic for quality validation and profiling
-    repositories/   # Domain SQL for database operations
-    validators/     # Validation logic (schema, completeness, uniqueness, bounds)
-    tests/          # Unit and integration tests
-```
+## Layout (short)
 
-## Jobs
+- `cli/` — package console entrypoints (`file-processing`, `file-processing-sns`).
+- `jobs/` — job entry modules (export `JOB = (entrypoint, description)`).
+- `parsers/` — file parsers (CSV/JSONL/Parquet).
+- `processors/` — business logic (profiling, validators, scoring).
+- `validators/` — individual validation rules (schema, completeness, uniqueness, bounds).
+- `repositories/` — DB queries for monitoring files, runs, profiles, and quality results.
+- `tests/` — unit tests for all components.
 
-Jobs are discovered automatically by the CLI. Each job module must export a `JOB` tuple:
+## Jobs and discovery
 
-```python
-# packages/file_processing/jobs/my_job.py
-from typing import List
+Jobs must export a `JOB` tuple. The CLI discovers available jobs and exposes a `run` command:
 
-def entrypoint(argv: List[str]) -> int:
-    # Job logic here
-    return 0  # Exit code
+- `file-processing list` — list jobs
+- `file-processing run <job_name> [args...]` — run a job
+- `file-processing help <job_name>` — job help
 
-JOB = (entrypoint, "Description of my job")
-```
+The primary job in this package is `s3_data_quality_job` (processes S3 object events for DQ/profiling).
 
-### Available Jobs
+Job contract (recommended): export a `JOB = (entrypoint, description)` where `entrypoint(argv: List[str]) -> int`.
 
-| Job Name | Description |
-|----------|-------------|
-| `s3_data_quality_job` | Process S3 objects for data quality validation |
+## CLI / SNS listener
 
-## CLI Usage
+- `file-processing` — main CLI for invoking jobs locally or inside containers.
+- `file-processing-sns` — small HTTP listener that accepts SNS `SubscriptionConfirmation` and `Notification` POSTs and forwards the message to the job pipeline (dev use).
 
-```bash
-# List available jobs
-file-processing list
+The SNS listener wraps the SNS envelope and calls the job entrypoint with a synthetic event so the same event parsing logic is reused.
 
-# Run a job
-file-processing run <job_name> [job_args...]
+## S3 key format
 
-# Show job help
-file-processing help <job_name>
-```
+The pipeline expects S3 keys that include routing metadata. The most common formats supported (parser is tolerant and also supports shorter keys for development):
 
-### S3 Data Quality Job Examples
+- Strict canonical (production):
 
-```bash
-# Process a single S3 object (production)
-file-processing run s3_data_quality_job --bucket my-bucket --key agency/tenant/files/report/2026-01-04/12/data.csv
+  `agency/<agency_slug>/files/<file_name>/<YYYY-MM-DD>/<HH>/data.<ext>`
 
-# Process from JSON event (production or replay)
-file-processing run s3_data_quality_job --event-json '{"bucket": "my-bucket", "key": "agency/tenant/files/report/2026-01-04/12/data.csv"}'
+  Example: `agency/tenant-a/files/daily-report/2026-01-04/12/data.csv`
 
-# Batch process from events file (production replay)
-file-processing run s3_data_quality_job --events-file events.json
+- S3 notification keys may be nested under a prefix (for example `from_client/...`). For local development you can set `LOCAL_S3_ROOT` and pass keys relative to that root.
 
-# Verbose output
-file-processing run s3_data_quality_job --bucket my-bucket --key path/to/file.csv -v
-```
+The job extracts these fields from the key: `agency_slug`, `file_name`, optional `run_date` and `run_hour` when present.
 
-## SQS Consumer
+## Data Quality scoring (summary)
 
-The package includes a long-polling SQS consumer that forwards messages to the `s3_data_quality_job`.
+- Starting score: 100
+- Proportional deductions are applied per-category. Categories and maxima:
+  - Schema: max 40 (required columns, type mismatches)
+  - Format: max 35 (parse errors)
+  - Completeness: max 20 (nulls in required fields)
+  - Bounds: max 15 (values outside min/max)
+  - Uniqueness: max 10 (duplicate values for columns marked `unique`)
 
-```bash
-# Run the SQS consumer (requires SQS_QUEUE_URL env var)
-file-processing-sqs
-```
+Score computation (backend):
+- Each validator reports `failed_checks` and `total_checks` (or an equivalent failure ratio).
+- Deduction = (failure_ratio) * category_max
+- Final score = clamp(round(100 - sum(deductions)), 0, 100)
+- Pass threshold = score >= 80
 
-## S3 Key Format
+Refer to `packages/file_processing/constants.ts` (frontend helper) for formulas used in tooltips.
 
-The pipeline expects S3 keys in the following format:
+### Uniqueness semantics (important)
 
-```
-agency/<agency_slug>/files/<file_name>/<YYYY-MM-DD>/<HH>/data.<ext>
-```
+- The pipeline no longer uses a concept of `primary_key` or `identity` columns for profiling/duplicate detection.
+- Uniqueness checks are driven solely by the schema flags (`unique: true` on column definitions or `unique_keys` lists when present).
+- Per-column uniqueness:
+  - Null-like values are ignored when computing unique counts and duplicate percentages. Null-like values are: `None`, empty/whitespace strings, or the literal string `"null"` (case-insensitive).
+  - Cardinality is reported as the percentage of unique, non-null values across rows.
+- Full-row duplicates (profiling duplicates):
+  - Full-row duplicates are computed by comparing tuples of row values across all file columns (the profiler no longer excludes any column by default). Two rows are duplicates only if every column value is equal after the profiler's null normalization.
+  - The UI shows: `Total Rows`, `Unique Rows`, `Duplicates` (count), `Duplicate %` (duplicates / totalRows * 100).
 
-Example:
-```
-agency/tenant-a/files/daily-report/2026-01-04/12/data.csv
-```
+This separation keeps vertical per-column uniqueness (for `unique` constraints) distinct from horizontal full-row duplicate detection used for profiling.
 
-This is parsed to extract:
-- `agency_slug`: `tenant-a`
-- `file_name`: `daily-report`
-- `run_date`: `2026-01-04`
-- `run_hour`: `12`
-- `file_format`: `csv`
+## Profiling classification rules
 
-## Data Quality Scoring
+For each column the profiler produces a single entry. Which metrics appear depends on whether the column is treated as numeric or categorical:
 
-Starting score: **100**
+- Schema precedence: if the pinned schema marks a column numeric (`integer`, `float`, `decimal`, `number`, etc.), the profiler treats it as numeric and computes numeric statistics (mean, median, stdDev, min, max, outliers, etc.).
+- Heuristic fallback: if schema type is not present, the profiler will attempt to coerce non-null values to numbers. The column is treated as numeric only when at least 80% of non-null values parse as numbers; otherwise it is treated as categorical.
 
-Deductions are proportional based on failure ratio:
+Notes:
+- The profiler treats the string values `null`, empty, and whitespace-only as nulls.
+- For categorical columns the profiler produces a histogram (when cardinality is small enough) and per-column duplicate counts.
+- `iqr` field is not emitted in the statistical summary (frontend doesn't use it).
 
-| Category | Max Deduction | Description |
-|----------|---------------|-------------|
-| Schema | 40 | Required columns, type validation |
-| Format | 35 | File parsing errors |
-| Completeness | 20 | Null values in required fields |
-| Bounds | 15 | Values outside min/max ranges |
-| Uniqueness | 10 | Duplicate values in unique keys |
+## Schema examples
 
-**Pass threshold**: score >= 80
-
-### Uniqueness Validation
-
-Uniqueness checks are performed based on the pinned schema version.
-- **Nulls ignored**: Values considered null (`None`, empty string, `"null"`) are ignored during uniqueness checks.
-- **Required keys**: If a unique key column is marked `required: true` in the schema, missing values count as failures.
-- **Business Duplicates**: The profiling step calculates "duplicate rows" by effectively ignoring columns marked as `primary_key` or `identity` in the schema. This ensures technical IDs do not mask duplication in business data.
-
-### Proportional Deductions
-
-Deductions are calculated proportionally. For example, if 1 of 5 schema fields fails:
-- Deduction = 40 * (1/5) = 8 points
-- Final score = 100 - 8 = 92 (PASSED)
-
-## Schema Definition
-
-Schema definitions are stored in `reporting.monitoring_file_schema_definition` and linked to monitoring files. Example:
+A schema definition is a JSON stored in your monitoring schema tables. Minimal example:
 
 ```json
 {
-    "columns": [
-        {"name": "id", "type": "integer", "required": true, "nullable": false, "unique": true},
-        {"name": "name", "type": "string", "required": true, "nullable": false},
-        {"name": "age", "type": "integer", "required": false, "min": 0, "max": 150},
-        {"name": "created_at", "type": "datetime", "required": true}
-    ],
-    "unique_keys": ["id"],
-    "strict": false
+  "columns": [
+    {"name": "record_id", "type": "integer", "unique": true, "required": true},
+    {"name": "badge_number", "type": "string", "required": true},
+    {"name": "hours", "type": "decimal", "min": 0, "required": true}
+  ],
+  "unique_keys": ["record_id"]
 }
 ```
 
-Supported types: `string`, `integer`, `float`, `boolean`, `date`, `datetime`
+Supported types: `string`, `integer`, `float`, `decimal`, `boolean`, `date`, `datetime`.
 
-## Data Profiling Logic
+## Configuration (.env)
 
-The profiler generates statistical summaries for each column to support analyst exploration.
+Create `packages/file_processing/.env` for local development. Recommended variables:
 
-### How columns are classified
+- `LOCAL_S3_ROOT` — when set, the processor will read local files under this path instead of S3 (useful for dev and dry runs).
+- `DATABASE_URL` or `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` — database config used by `etl_core.database.client`.
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — only needed when the S3Client will interact with real S3.
+- `PORT` — port for the SNS HTTP listener (default 8080).
 
-Each column produces a single profiling entry. The set of metrics shown for a column depends on how the column is classified: schema-defined numeric columns receive numeric statistics (mean, median, stdDev, min, max, IQR, outliers, etc.); non-numeric columns receive categorical metrics (unique counts, cardinality, duplicates, and value histograms).
+**Tip**: commit a `packages/file_processing/.env.example` with placeholder values and copy it to `.env` locally.
 
-**Classification rules:**
+## Docker and local runs
 
-1.  **Schema precedence**: If the file’s pinned schema explicitly marks the column numeric (for example: `integer`, `bigint`, `float`, `numeric`, `decimal`), the profiler treats it as numeric.
-2.  **Heuristic fallback**: When no schema type is provided, the profiler attempts to coerce non‑null values to numbers and classifies the column as numeric only when at least **80%** of non‑null values parse as numbers; otherwise it is treated as categorical.
+Dockerfiles are in `docker/` and expect you run `docker build` from the repository root so `COPY packages/...` statements succeed.
 
-**Example**: For a free‑text field like `first_name`, a single row with value `12345` will not turn the column numeric: if the schema marks `first_name` as string it stays categorical, and if there are many names with only one numeric-looking value the numeric coercion rate will be below 80%, so the column remains categorical.
-
-## Database Tables
-
-The pipeline reads/writes to these `reporting.*` tables:
-
-| Table | Purpose |
-|-------|---------|
-| `monitoring_file` | Monitored file configurations |
-| `monitoring_file_schema_definition` | Schema definitions for validation |
-| `monitoring_file_run` | Hourly processing runs (unique by file+date+hour) |
-| `monitoring_file_data_quality` | Quality scores, metrics, deductions |
-| `monitoring_file_data_profile` | Profiling payloads (stats, distributions, samples) |
-| `monitoring_file_failed_validation` | Rule-level failure details |
-
-## Configuration
-
-Environment variables:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | - |
-| `DB_HOST` | Database host | `localhost` |
-| `DB_PORT` | Database port | `5432` |
-| `DB_NAME` | Database name | `postgres` |
-| `DB_USER` | Database user | `postgres` |
-| `DB_PASSWORD` | Database password | - |
-| `AWS_ACCESS_KEY_ID` | AWS access key (optional for IAM) | - |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key (optional for IAM) | - |
-| `AWS_REGION` | AWS region | `us-gov-west-1` |
-| `SQS_QUEUE_URL` | SQS Queue URL for `file-processing-sqs` consumer | - |
-| `S3_SOURCE_BUCKET` | Source bucket for S3 operations | - |
-| `S3_DESTINATION_BUCKET` | Destination bucket | - |
-
-## Package-level .env and DB configuration
-
-You can set package-local environment variables by creating `packages/file_processing/.env` (the CLI will load it automatically).
-
-Use this file to configure local S3 shim and database connection settings used during development. There are two supported ways to configure the database:
-
-1) Full DB URL (recommended):
-
-```
-DATABASE_URL=postgresql://user:password@hostname:5432/dbname
-```
-
-2) Individual DB_* variables:
-
-```
-DB_HOST=hostname
-DB_PORT=5432
-DB_NAME=etl
-DB_USER=etl
-DB_PASSWORD=secret
-```
-
-When the job runs, `etl_core.database.client.DatabaseClient` reads environment variables in the usual way; because the CLI loads the package `.env` before job discovery, the DB variables set in `packages/file_processing/.env` are available to `DatabaseClient`.
-
-Tip: Commit `packages/file_processing/.env.example` to the repo and copy it to `.env` when you need to run locally (do not commit secrets).
-
-## Local development vs Production
-
-We run the exact same production code in both environments. For local development you can:
-
-- Mimic incoming SQS/SNS events by passing an AWS-style event JSON to the job.
-- Mock object downloads by setting `LOCAL_S3_ROOT` (the job will read objects from local disk in the same key layout as S3).
-- Point the `DatabaseClient` at the shared Postgres (set `DATABASE_URL` or `DB_*` environment variables) — do not stand up a separate Postgres in compose for local dev unless you want a full local DB.
-
-This keeps development and production behavior identical and reduces surprises when deploying.
-
-### Event formats you can pass to `--event-json`
-
-1) Direct simple payload
-
-```json
-{"bucket": "my-bucket", "key": "agency/demo/files/my-file/2026-01-04/12/data.csv"}
-```
-
-2) AWS S3 Event Records
-
-```json
-{"Records": [{"s3": {"bucket": {"name": "my-bucket"}, "object": {"key": "agency/demo/files/my-file/2026-01-04/12/data.csv"}}}]}
-```
-
-3) SNS-wrapped message (common when S3 -> SNS -> SQS -> consumer)
-
-```json
-{"Records": [{"Sns": {"Message": "{\"Records\": [{\"s3\": {\"bucket\": {\"name\": \"my-bucket\"}, \"object\": {\"key\": \"agency/demo/files/my-file/2026-01-04/12/data.csv\"}}]}"}}]}
-```
-
-4) SQS-wrapped message (SQS consumer with SNS/S3 payload in body)
-
-```json
-{"Records": [{"body": "{\"Records\": [{\"s3\": {\"bucket\": {\"name\": \"my-bucket\"}, \"object\": {\"key\": \"agency/demo/files/my-file/2026-01-04/12/data.csv\"}}]}"}]}
-```
-
-### Local file shim (simulate S3 object bytes)
-
-1. Set `LOCAL_S3_ROOT` to a directory where you place files that map to S3 keys.
-
-Example directory layout for the key `agency/demo/files/my-file/2026-01-04/12/data.csv`:
-
-```
-$LOCAL_S3_ROOT/agency/demo/files/my-file/2026-01-04/12/data.csv
-```
-
-2. Set `LOCAL_S3_ROOT` and run the job with an AWS-style event (see examples above):
+- Build file-processing image:
 
 ```bash
-export LOCAL_S3_ROOT=/path/to/local/s3/root
-file-processing run s3_data_quality_job -- \
-  --event-json '{"Records":[{"s3":{"bucket":{"name":"ignored-local"},"object":{"key":"agency/demo/files/my-file/2026-01-04/12/data.csv"}}}]}'
+docker build -f docker/file-processing.Dockerfile -t etl-file-processing .
 ```
 
-The job will use the same download/parse/validate/persist code paths as production; only the S3 client is swapped for a tiny filesystem-backed shim.
+- Run s3 DQ job (dry-run) with mounted repo and local `.env`:
 
-### Production usage
+```bash
+docker run --rm -v "$PWD":/app -w /app \
+  --env-file packages/file_processing/.env \
+  -e DB_HOST=host.docker.internal \
+  -e PYTHONPATH=/app/packages \
+  etl-file-processing \
+  run s3_data_quality_job -- \
+    --event-json '{"Records": [{"s3": {"bucket": {"name": "ignored"}, "object": {"key": "from_client/nm_albuquerque/Officer_Detail.csv"}}}]}' \
+    --dry-run --dry-run-output ./dry_run_results.jsonl -v
+```
 
-- In production the job receives SQS/SNS messages with S3 records and runs the same `s3_data_quality_job` entrypoint.
-- Configure AWS credentials (IAM) and `S3Config` via environment variables to let the `S3Client` use real S3.
-- Configure `DatabaseClient` via `DATABASE_URL` or `DB_*` environment variables to point at the shared platform Postgres.
+- Run SNS HTTP listener inside the image:
 
-### Quick tips
+```bash
+docker run --rm -it -v "$PWD":/app -w /app \
+  --env-file packages/file_processing/.env \
+  -e PORT=8080 -e PYTHONPATH=/app/packages \
+  --entrypoint python \
+  etl-file-processing -m file_processing.cli.sns_main
+```
 
-- To replay events for debugging, save the original event JSON and pass it with `--events-file`.
-- For tests and local CI, inject test doubles for `DatabaseClient`, `MonitoringRepository`, and `S3Client` into the `entrypoint` call (the job supports DI).
+See `scripts/commands.sh` for a curated set of copy/paste commands.
 
 ## Testing
 
+Run unit tests for this package:
+
 ```bash
-# Run unit tests
 python -m pytest packages/file_processing/tests/unit -v
-
-# Run a single test file
-python -m pytest packages/file_processing/tests/unit/test_s3_data_quality_processor.py -q
 ```
 
-## Development
+All validators and processors include unit tests; tests use DI-friendly fakes for the repository and S3 client.
 
-### Adding a New Validator
+## Adding new jobs, validators, or parsers
 
-1. Create a new validator in `validators/`:
+- Jobs: add a module under `jobs/` and export `JOB = (entrypoint, description)`.
+- Validators: add a new class under `validators/` implementing `BaseValidator` and register it in `_run_validations` inside the processor.
+- Parsers: add a parser under `parsers/` and register it in `parsers/registry.py`.
 
-```python
-from file_processing.validators.base import BaseValidator, ValidationResult
+## Troubleshooting & notes
 
-class MyValidator(BaseValidator):
-    @property
-    def validator_name(self) -> str:
-        return "my_check"
+- If you receive `ModuleNotFoundError: No module named 'file_processing'` when running in Docker, ensure `PYTHONPATH=/app/packages` is set and that you built the image from the repository root.
+- Use `LOCAL_S3_ROOT` for development to avoid S3 credentials and to debug against local files.
+- The profiler treats `null` / empty / whitespace-only as null values which are ignored for per-column uniqueness calculations but are part of full-row comparisons when values are equal across rows.
 
-    def validate(self, rows, columns, schema_definition) -> ValidationResult:
-        # Validation logic
-        return ValidationResult(passed=True, details="OK")
-```
+---
 
-2. Register in the processor's `_run_validations()` method.
-
-### Adding a New Parser
-
-1. Create a new parser in `parsers/`:
-
-```python
-from file_processing.parsers.base import BaseParser, ParseResult
-
-class MyParser(BaseParser):
-    @property
-    def format_name(self) -> str:
-        return "myformat"
-
-    def parse(self, file_obj) -> ParseResult:
-        # Parsing logic
-        return ParseResult(success=True, rows=[], columns=[])
-```
-
-2. Register in `parsers/registry.py`.
+If you want, I can also add a short section with example SNS subscription steps (how to configure topic -> HTTPS subscription) or create a small `docker-compose` for local SNS testing behind an HTTP tunnel. Ask if you'd like either of those added.

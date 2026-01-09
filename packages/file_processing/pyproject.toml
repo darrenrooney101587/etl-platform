@@ -16,7 +16,7 @@ parquet = ["pyarrow"]
 
 [tool.poetry.scripts]
 file-processing = "file_processing.cli.main:main"
-file-processing-sqs = "file_processing.cli.sqs_main:main"
+file-processing-sns = "file_processing.cli.sns_main:main"
 
 [build-system]
 requires = ["poetry-core"]

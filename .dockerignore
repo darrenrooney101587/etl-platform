@@ -1,0 +1,48 @@
+# Ignore git and ide files
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+
+# Ignore python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ignore virtual environments
+.venv
+venv/
+ENV/
+
+# Ignore test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+# Ignore local data/config
+.env
+data/
+output/
+dry_run_results.jsonl
+e the

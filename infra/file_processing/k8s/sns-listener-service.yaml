@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sns-listener
+  namespace: default
+spec:
+  type: LoadBalancer
+  selector:
+    app: sns-listener
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

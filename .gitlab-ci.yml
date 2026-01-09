@@ -7,7 +7,7 @@ variables:
   POETRY_CACHE_DIR: ".cache/pypoetry"
   POETRY_GIT_USE_SYSTEM_GIT: "1"
   GIT_SSH_COMMAND: 'ssh -i /root/.ssh/id_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes'
-  AWS_REGION: "us-east-1"
+  AWS_REGION: "us-gov-west-1"
 
 cache:
   key: poetry-cache
