@@ -1,25 +1,61 @@
-Explanation: Add an infra README describing the purpose of the folder, Kubernetes/EKS Job manifest guidance, SNS subscription notes, local dev testing (ngrok), and pointers to the on-demand Postgres terraform module. Provide example `kubectl` commands and tips for secrets and service accounts.
-
 # file_processing infra
 
-This directory contains infrastructure guidance and example manifests for deploying the `file_processing` runtime into a Kubernetes/EKS environment. It is intentionally small — the repo keeps application code in `packages/file_processing` and infra examples here so teams can adapt them to their own CI/CD and cluster conventions.
+> **Quick Start (2 steps):**
+>
+> 1) Create shared AWS network primitives (run once per environment):
+> ```bash
+> cd infra/foundation_network
+> ./scripts/manage.sh apply
+> ```
+>
+> 2) Provision the `file_processing` EKS cluster + SNS wiring + Kubernetes resources:
+> ```bash
+> cd infra/file_processing
+> ./scripts/manage_cluster.sh init
+> ```
+>
+> Update code:
+> ```bash
+> ./scripts/manage_cluster.sh update
+> ```
+>
+> Tear down the `file_processing` cluster and app resources:
+> ```bash
+> ./scripts/manage_cluster.sh teardown
+> ```
 
-This README covers:
-- purpose of these infra artifacts
-- example Kubernetes manifests (Job and Deployment for the SNS listener)
-- secrets and config recommendations
-- how to test locally (ngrok) and in-cluster
-- pointer to the on-demand Postgres Terraform module
+This directory provisions a dedicated **EKS cluster** for the `file_processing` runtime plus the AWS wiring it needs (SNS topic and optional S3 bucket notifications). It is designed to run **after** `infra/foundation_network`, which owns the shared VPC/subnets/NAT/IGW.
 
 ---
 
-## Purpose
+## What this stack manages
 
-The `file_processing` package is executed as either:
-- short-lived EKS Jobs that run `file-processing run s3_data_quality_job ...` for individual events, or
-- a long-running worker/Deployment that exposes an HTTP endpoint for SNS `Notification` POSTs (the dev SNS listener implemented at `file_processing.cli.sns_main`).
+- EKS cluster + managed node group
+- SNS topic for file processing
+- Optional: S3 bucket notifications (`s3:ObjectCreated:*`) -> SNS topic
+- Optional: HTTP subscription to SNS (`sns_endpoint_url`) if you provide a stable endpoint
+- Kubernetes resources deployed into the cluster:
+  - Namespace
+  - ServiceAccount
+  - Deployment (`file-processing-sns`)
+  - Service (LoadBalancer)
 
-This `infra/file_processing` folder provides example manifests and pointers for both patterns so teams can pick the mode that fits their operational model.
+## Key inputs
+
+Values live in `terraform.tfvars`.
+
+- `foundation_name_prefix`: tag prefix used to discover the foundation VPC and subnets (defaults to `etl-platform`). The stack will look for a VPC with Name `<foundation_name_prefix>-vpc` and private subnets named like `<foundation_name_prefix>-private-*`.
+- `vpc_id`: optional override for the VPC id; if set, discovery by tag is skipped.
+- `bucket_name`: bucket to configure notifications for
+- `create_s3_notifications`: set true to enable S3 -> SNS notifications
+- `sns_endpoint_url`: optional HTTP endpoint for SNS delivery
+
+---
+
+## Notes
+
+- For production-grade event delivery, SNS -> SQS tends to be more reliable than SNS -> HTTP. The current stack supports SNS -> HTTP to match the existing listener.
+- This stack assumes you have permissions to create EKS/IAM resources in the target AWS account.
 
 ---
 
@@ -160,6 +196,75 @@ infra/postgres_on_demand
 ```
 
 It provisions a PostgreSQL 15 RDS instance with minimal networking if you don't provide an existing VPC/subnets. It is intended for ad-hoc use and is **not** production-grade without customization. See that module's README for usage and teardown instructions.
+
+---
+
+## Scripts (convenience helpers)
+
+This repository includes a small set of helper scripts in `infra/file_processing/scripts/` to perform common developer and operational tasks. Each script is intentionally narrow in scope so you can compose them in CI or call them manually.
+
+Location: `infra/file_processing/scripts/`
+
+Scripts provided (summary):
+
+- `manage.sh` — Primary entrypoint for the `file_processing` Terraform stack.
+  - What it does: manage the file_processing Terraform stack (EKS + SNS + K8s) and support image updates.
+  - Commands:
+    - `init` — terraform init
+    - `plan` — terraform plan
+    - `apply` — terraform apply -auto-approve
+    - `destroy` — terraform destroy -auto-approve
+    - `update-image` — build & push image to ECR (via `ecr_put.sh`) and then `terraform apply -var="image=..."`
+    - `outputs` — show Terraform outputs
+  - Example:
+    ```bash
+    # Initialize
+    cd infra/file_processing
+    ./scripts/manage.sh init
+
+    # Build/push image and apply
+    ./scripts/manage.sh update-image
+
+    # Destroy
+    ./scripts/manage.sh destroy
+    ```
+
+- `manage_cluster.sh` — Legacy/compatibility helper. Some older docs and CI may still call this script; prefer `manage.sh` going forward.
+
+- `ecr_put.sh` — Build and push the container image to ECR.
+  - What it does: ensures the ECR repository exists, logs in, builds a multi-arch image with `docker buildx`, pushes the image, and writes the pushed image URI to `infra/file_processing/container_image.txt`.
+  - Used by: `manage.sh` and `manage_cluster.sh`.
+
+- `s3_configure_notifications.sh` — Configure an S3 bucket to publish ObjectCreated events to a topic.
+  - What it does: writes a temporary notification JSON and calls `aws s3api put-bucket-notification-configuration`.
+  - Example:
+    ```bash
+    BUCKET=etl-ba-research-client-etl AWS_PROFILE=etl-playground AWS_REGION=us-gov-west-1 ./scripts/s3_configure_notifications.sh
+    ```
+
+- `sns_subscribe.sh` — Create an SNS subscription for an HTTP endpoint.
+  - Example:
+    ```bash
+    SNS_TOPIC_ARN=arn:aws-us-gov:sns:us-gov-west-1:270022076279:file-processing-topic ENDPOINT=https://<your-host>/ AWS_PROFILE=etl-playground ./scripts/sns_subscribe.sh
+    ```
+
+- `sns_probe_listener.sh` — Quick helper to list subscriptions for a topic (used to verify listener subscription state).
+  - Example:
+    ```bash
+    ./scripts/sns_probe_listener.sh
+    ```
+
+- `sns_set_topic_policy.sh` — Set an SNS topic policy (e.g., allow S3 to publish to a topic for a particular bucket/account).
+  - Example:
+    ```bash
+    ACCOUNT_ID=270022076279 BUCKET=etl-ba-research-client-etl AWS_PROFILE=etl-playground ./scripts/sns_set_topic_policy.sh
+    ```
+
+Notes and best practices
+
+- Separation of concerns: `ecr_put.sh` is responsible only for publishing an immutable artifact to your registry. Terraform (via `manage_cluster.sh`) is responsible for instructing Kubernetes to use that artifact.
+- Use image digests for immutable deployments: prefer updating your Deployment to `registry/repo@sha256:<digest>` instead of a mutable tag.
+- Permissions: `ecr_put.sh` requires AWS credentials that can manage ECR. `manage_cluster.sh` requires both AWS credentials and `kubectl` access to the target cluster.
 
 ---
 

@@ -6,7 +6,7 @@ AWS_REGION="${AWS_REGION:-us-gov-west-1}"
 ECR_REPO_NAME="file-processing"
 
 # Determine repo root (two levels up from infra/file_processing/scripts)
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
 DOCKERFILE_PATH="${REPO_ROOT}/docker/file-processing.Dockerfile"
 BUILD_CONTEXT="${REPO_ROOT}"
 
@@ -56,5 +56,5 @@ docker buildx build \
   -f "${DOCKERFILE_PATH}" \
   "${BUILD_CONTEXT}"
 
-echo "✓ Image pushed to: ${IMAGE_URI}"
+echo "Image pushed to: ${IMAGE_URI}"
 echo "container_image = \"${IMAGE_URI}\"" > "${REPO_ROOT}/infra/file_processing/container_image.txt"

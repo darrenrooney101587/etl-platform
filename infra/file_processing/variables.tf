@@ -10,16 +10,64 @@ variable "aws_profile" {
   default     = "etl-playground"
 }
 
-variable "kubeconfig_path" {
-  description = "Path to kubeconfig for the Kubernetes provider (optional). If empty, the provider will use in-cluster config or default kubeconfig."
+variable "foundation_name_prefix" {
+  description = "Name prefix used by the foundation_network stack for tagging (e.g., etl-platform)."
   type        = string
-  default     = "~/.kube/config"
+  default     = "etl-platform"
 }
 
-variable "kubeconfig_context" {
-  description = "Kubeconfig context name to use for Kubernetes provider (optional)."
+variable "vpc_id" {
+  description = "Optional override for the VPC ID. If empty, the VPC will be discovered by tag (Name=<foundation_name_prefix>-vpc)."
   type        = string
   default     = ""
+}
+
+variable "cluster_name" {
+  description = "EKS cluster name"
+  type        = string
+  default     = "file-processing-cluster"
+}
+
+variable "node_group_name" {
+  description = "EKS managed node group name"
+  type        = string
+  default     = "file-processing-nodes"
+}
+
+variable "node_instance_types" {
+  description = "EKS node group instance types"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+variable "node_desired_size" {
+  description = "Desired node count"
+  type        = number
+  default     = 2
+}
+
+variable "node_min_size" {
+  description = "Minimum node count"
+  type        = number
+  default     = 1
+}
+
+variable "node_max_size" {
+  description = "Maximum node count"
+  type        = number
+  default     = 3
+}
+
+variable "sns_topic_name" {
+  description = "SNS topic name for file processing notifications"
+  type        = string
+  default     = "file-processing-topic"
+}
+
+variable "create_s3_notifications" {
+  description = "If true, configure S3 bucket notifications to SNS"
+  type        = bool
+  default     = false
 }
 
 variable "namespace" {
@@ -56,4 +104,17 @@ variable "annotations" {
   description = "Optional annotations for namespace or serviceaccount (map)"
   type        = map(string)
   default     = {}
+}
+
+# Declared to match values provided in terraform.tfvars
+variable "bucket_name" {
+  description = "Name of the S3 bucket used by some modules (provided via terraform.tfvars)."
+  type        = string
+  default     = ""
+}
+
+variable "sns_endpoint_url" {
+  description = "URL used by SNS subscriptions to deliver notifications (provided via terraform.tfvars)."
+  type        = string
+  default     = ""
 }
