@@ -2,18 +2,29 @@
 set -euo pipefail
 
 # Lightweight test helper to publish a sample SNS S3-event JSON to the file-processing topic.
-# Usage: ./test.sh
+# Usage: ./sns_test_topic.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Prefer git repo root if available, otherwise fall back to relative path math
+if git -C "$SCRIPT_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+else
+  # Script lives at: <repo-root>/infra/file_processing/scripts
+  # so go up three levels to reach repo root
+  REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
+
+# Terraform directory for the file_processing infra (repo-root/infra/file_processing)
 TF_DIR="$REPO_ROOT/infra/file_processing"
 
 echo "Repo root: $REPO_ROOT"
+echo "Terraform dir: $TF_DIR"
 
-SNS_TOPIC_ARN="$(terraform -chdir="$TF_DIR" output -raw sns_topic_arn 2>/dev/null || true)"
+SNS_TOPIC_ARN="${SNS_TOPIC_ARN:-$(terraform -chdir="$TF_DIR" output -raw sns_topic_arn 2>/dev/null || true)}"
 if [ -z "$SNS_TOPIC_ARN" ]; then
   echo "ERROR: terraform output sns_topic_arn is empty or terraform failed."
-  echo "Run: terraform -chdir=$TF_DIR output -json to debug."
+  echo "Run: terraform -chdir=$TF_DIR output -json to debug. (Checked TF_DIR above)"
   exit 1
 fi
 

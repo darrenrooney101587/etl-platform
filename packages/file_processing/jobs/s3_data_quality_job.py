@@ -172,11 +172,25 @@ def entrypoint(argv: List[str]) -> int:
 
             try:
                 result = processor.process_s3_event(event)
-                logger.info(
-                    "Success: %s (Quality Score: %s)",
-                    event.key,
-                    result.score if result else "N/A",
-                )
+
+                # If processor returned a DataQualityResult, treat a non-passing result as a failure.
+                # This ensures parse failures and validation failures (which return a result object)
+                # cause the job to report a non-zero exit code rather than being treated as success.
+                passed = getattr(result, "passed", True)
+                if not passed:
+                    logger.error(
+                        "Processing completed but reported failure for %s (score=%s)",
+                        event.key,
+                        getattr(result, "score", "N/A"),
+                    )
+                    failure_count += 1
+                else:
+                    logger.info(
+                        "Success: %s (Quality Score: %s)",
+                        event.key,
+                        getattr(result, "score", "N/A"),
+                    )
+
             except Exception as e:
                 logger.exception("Failed to process object %s", event.key)
                 failure_count += 1

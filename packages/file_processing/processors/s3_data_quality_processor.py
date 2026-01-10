@@ -541,7 +541,8 @@ class S3DataQualityProcessor:
         )
 
         score = DataQualityResult.compute_score(deductions)
-        passed = DataQualityResult.is_passed(score)
+        # Treat parse failures as hard failures regardless of computed score
+        passed = False
 
         return DataQualityResult(
             score=score,
