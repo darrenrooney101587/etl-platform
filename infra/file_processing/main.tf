@@ -131,6 +131,19 @@ data "aws_eks_cluster" "this" {
   depends_on = [aws_eks_node_group.this]
 }
 
+data "terraform_remote_state" "postgres" {
+  backend = "local"
+  config = {
+    path = "${path.module}/../postgres_on_demand/terraform.tfstate"
+  }
+}
+
+locals {
+  # Use provided variable if set, otherwise try to discover from postgres_on_demand stack
+  # If neither, this will be empty string
+  db_host = var.db_host != "" ? var.db_host : try(data.terraform_remote_state.postgres.outputs.db_endpoint, "")
+}
+
 data "aws_eks_cluster_auth" "this" {
   name = aws_eks_cluster.this.name
 
@@ -240,8 +253,29 @@ resource "kubernetes_deployment_v1" "sns_listener" {
           }
 
           env {
-            name  = "PORT"
-            value = "8080"
+            name  = "DB_HOST"
+            value = local.db_host
+          }
+
+          # Database connection config injected from Terraform variables / remote state
+          env {
+            name  = "DB_PORT"
+            value = var.db_port
+          }
+
+          env {
+            name  = "DB_NAME"
+            value = var.db_name
+          }
+
+          env {
+            name  = "DB_USER"
+            value = var.db_user
+          }
+
+          env {
+            name  = "DB_PASSWORD"
+            value = var.db_password
           }
         }
       }

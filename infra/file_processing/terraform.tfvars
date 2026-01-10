@@ -17,3 +17,11 @@ image = "270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/file-processing:latest
 
 # Optional: only set this once you have a stable endpoint (e.g., HTTPS ALB/Ingress) for SNS to call.
 sns_endpoint_url = "http://a7534c881728c464386b7ad3c81732d8-351968556.us-gov-west-1.elb.amazonaws.com"
+
+# Database Configuration
+# db_host is auto-discovered from infra/postgres_on_demand state via main.tf locals if left empty
+db_host     = "dev-postgres-on-demand.cfjoowotyxqw.us-gov-west-1.rds.amazonaws.com"
+db_port     = "5432"
+db_name     = "etl_db"
+db_user     = "etl_user"
+db_password = "Password123!#"

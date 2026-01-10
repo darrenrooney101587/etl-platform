@@ -9,7 +9,8 @@ locals {
 
 resource "random_password" "db_password" {
   length           = 24
-  override_char_set = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*()-_+="
+  special          = true
+  override_special = "!@#$%&*()-_=+"
   keepers = {
     # rotate only when explicit input password changes
     input_pass = var.db_password
@@ -89,10 +90,9 @@ resource "aws_db_subnet_group" "rds_subnet_group" {
 resource "aws_db_instance" "postgres" {
   identifier              = local.name_prefix
   engine                  = "postgres"
-  engine_version          = "15.4"
   instance_class          = var.db_instance_class
   allocated_storage       = var.db_allocated_storage
-  name                    = var.db_name
+  db_name                 = var.db_name
   username                = var.db_username
   password                = var.db_password != "" ? var.db_password : random_password.db_password.result
   skip_final_snapshot     = true
