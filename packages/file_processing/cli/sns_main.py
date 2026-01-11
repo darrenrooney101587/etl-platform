@@ -30,66 +30,10 @@ from typing import Optional as TypingOptional
 
 # Import the correct entrypoint within the file_processing package
 from file_processing.jobs.s3_data_quality_job import entrypoint
+from packages.etl_core.support.circuit_breaker import CircuitBreaker
 
 
 logger = logging.getLogger(__name__)
-
-
-class CircuitBreaker:
-    """Simple thread-safe circuit breaker.
-
-    - Activates after `max_failures` consecutive failures.
-    - Remains active for `cooldown_seconds` since last failure. When cooldown
-      elapses, breaker resets and processing resumes.
-
-    Behavior note: by default the SNS handler will return HTTP 200 and
-    *skip* processing while the breaker is active to avoid retry storms
-    from SNS. If you prefer retries from SNS, change the handler to return
-    5xx instead.
-    """
-
-    def __init__(self, max_failures: int, cooldown_seconds: int, logger: logging.Logger) -> None:
-        self.max_failures = max_failures
-        self.cooldown_seconds = cooldown_seconds
-        self.consecutive_failures = 0
-        self.last_failure_time: TypingOptional[float] = None
-        self.active = False
-        self._lock = threading.Lock()
-        self.logger = logger
-
-    def record_failure(self) -> None:
-        with self._lock:
-            self.consecutive_failures += 1
-            self.last_failure_time = time.time()
-            self.logger.warning("CircuitBreaker: recorded failure (%d/%d)", self.consecutive_failures, self.max_failures)
-            if self.consecutive_failures >= self.max_failures:
-                if not self.active:
-                    self.active = True
-                    self.logger.error(
-                        "Circuit breaker activated after %d consecutive failures",
-                        self.max_failures,
-                    )
-
-    def record_success(self) -> None:
-        with self._lock:
-            if self.consecutive_failures > 0 or self.active:
-                self.logger.info("CircuitBreaker: success observed, resetting state")
-            self.consecutive_failures = 0
-            self.last_failure_time = None
-            self.active = False
-
-    def is_active(self) -> bool:
-        with self._lock:
-            if self.active and self.last_failure_time is not None:
-                # If cooldown has passed, reset and return False
-                if (time.time() - self.last_failure_time) >= self.cooldown_seconds:
-                    self.logger.info("CircuitBreaker: cooldown elapsed; resetting")
-                    self.consecutive_failures = 0
-                    self.last_failure_time = None
-                    self.active = False
-                    return False
-                return True
-            return False
 
 
 class SNSRequestHandler(BaseHTTPRequestHandler):
@@ -267,9 +211,9 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
 
                     # Check circuit breaker before submitting the job
                     circuit_breaker = getattr(server, "circuit_breaker", None)
-                    if circuit_breaker is not None and circuit_breaker.is_active():
-                        logger.warning("[%s] CircuitBreaker is active; skipping job submission", trace_id)
-                        self._send_json_response(200, {"status": "skipped"})
+                    if circuit_breaker is not None and not circuit_breaker.allow():
+                        logger.warning("Circuit breaker active; skipping message")
+                        self._send_json_response(200, {"status": "skipped", "reason": "circuit_breaker_active"})
                         return
 
                     executor.submit(self._run_job, event_json_str, trace_id)
@@ -367,7 +311,10 @@ def main() -> None:
         circuit_breaker_cooldown_seconds = 60
 
     # Attach a CircuitBreaker instance to the server
-    httpd.circuit_breaker = CircuitBreaker(circuit_breaker_max_failures, circuit_breaker_cooldown_seconds, logger)
+    httpd.circuit_breaker = CircuitBreaker(
+        max_failures=int(os.getenv("CIRCUIT_MAX_FAILURES", "5")),
+        reset_seconds=int(os.getenv("CIRCUIT_COOLDOWN_SECONDS", "300")),
+    )
 
     logging.basicConfig(level=logging.INFO)
     logger.info("Starting SNS listener on port %s with max_workers=%d...", port, max_workers)

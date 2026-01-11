@@ -96,6 +96,16 @@ All classes that talk to external resources (AWS, HTTP clients, DB connectors, r
     - Do not create/keep `manage.py`, `settings.py`, `wsgi.py`, `urls.py`, `views.py`, `apps.py`, `management/commands` inside active module packages.
     - Convert legacy Django management commands into CLI entrypoints under `./packages/<module>/cli/`.
 
+## Infra and new-module expectations
+
+- Foundation network first: shared VPC/subnets/NAT/IGW live in `infra/plumbing` (aka foundation_network). Apply this stack once per environment before any module-level infra.
+- Per-module infra stack: each deployable module should mirror the pattern under `infra/<module>/` (Terraform + `scripts/manage.sh` helper). New modules must not reuse other modules' Terraform; create their own stack that consumes the foundation outputs or explicitly passed VPC/subnet ids.
+- Local testing: keep LocalStack helpers under `infra/local` and add module-specific local scripts under `infra/<module>/scripts` (e.g., `setup_localstack.sh`) instead of bespoke locations.
+- Dockerfiles: place one Dockerfile per module under `docker/` (e.g., `docker/<module>.Dockerfile`). Images install only that module plus `etl_core` (and `etl-database-schema` if needed).
+- Module scaffolding: every new `packages/<module>/` must include `pyproject.toml`, `poetry.lock`, and package sources at the package root (no `src/` layout). Do not add cross-module imports beyond `etl_core`.
+- Jobs/processors/repos still apply: jobs orchestrate, processors hold business logic, repositories hold SQL. Infra additions must not move domain SQL into `etl_core`.
+- Put reusable, domain-agnostic utilities (e.g., circuit breakers, generic executors, shared config loaders) in `etl_core/support`. Keep domain-specific configs (like `SeederConfig`) and SQL in the owning package.
+
 ## Engineering expectations
 - When touching function signatures, add type hints (minimal).
 - Avoid introducing new abstractions during migration.

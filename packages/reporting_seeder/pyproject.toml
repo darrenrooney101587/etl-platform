@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "reporting-seeder"
+version = "0.1.0"
+description = "Daily materialized view refresh for agency reporting queries"
+authors = ["Admin <admin@example.com>"]
+readme = "README.md"
+packages = [{ include = "reporting_seeder" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+etl-core = { path = "../etl_core", develop = false }
+psutil = "^5.9"
+
+[tool.poetry.scripts]
+reporting-seeder = "reporting_seeder.cli.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -108,3 +108,12 @@ a
    - that module
    - `etl_core` (path dependency)
    - `etl-database-schema` only if the module requires it
+
+## Infra and new-module enforcement
+
+- Foundation prerequisite: ensure `infra/plumbing` (foundation_network) is applied once per environment before generating module-level infra. Do not inline foundation networking into module stacks.
+- Per-module infra pattern: create or update `infra/<module>/` with its own Terraform and `scripts/manage.sh` helper (init/plan/apply/destroy/update-image as applicable). Avoid reusing another module's Terraform state or scripts.
+- LocalStack/local helpers: place shared localstack utilities in `infra/local`; add module-specific local scripts under `infra/<module>/scripts` (e.g., `setup_localstack.sh`) instead of new ad-hoc locations.
+- Dockerfiles: require one Dockerfile per deployable module under `docker/<module>.Dockerfile`. Images must install only that module plus `etl_core` (and `etl-database-schema` if needed). Never build from repo root.
+- Module scaffolding: every new `packages/<module>/` must include `pyproject.toml`, `poetry.lock`, and sources at the package root (no `src/`). Enforce module boundaries: cross-module imports only via `etl_core`.
+- PR/reporting checklist: confirm job exposes `JOB`, processors use DI, repositories hold SQL, `etl_core` is SQL-free, module Dockerfile exists, module infra stack exists or was added, and foundation dependency is documented. Centralize reusable, domain-agnostic utilities (e.g., circuit breakers, generic executors, env loaders) in `etl_core/support`; keep domain-specific configs (like `SeederConfig`) in the owning package.
