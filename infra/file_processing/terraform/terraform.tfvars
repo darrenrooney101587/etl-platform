@@ -25,3 +25,5 @@ db_port     = "5432"
 db_name     = "etl_db"
 db_user     = "etl_user"
 db_password = "Password123!#"
+
+oidc_thumbprint = "0201a9f54320c2145814a507d7a3880c726eacd7"

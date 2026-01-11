@@ -45,12 +45,14 @@ class MonitoringRepository:
         self,
         agency_slug: str,
         file_name: str,
+        s3_key: Optional[str] = None,
     ) -> Optional[MonitoringFile]:
         """Look up a monitoring file by agency slug and file name.
 
         Args:
             agency_slug: The S3 agency slug (from the object key).
             file_name: The file name (from the object key).
+            s3_key: Optional full S3 key (from the event) to disambiguate files with same name.
 
         Returns:
             MonitoringFile if found, None otherwise.
@@ -111,6 +113,7 @@ class MonitoringRepository:
                 FROM reporting.monitoring_file mf
                 WHERE mf.agency_id = %s
                   AND mf.file_name = %s
+                ORDER BY mf.is_suppressed ASC, mf.id DESC
             """
             rows = self._db.execute_query(sql, [bms_id, file_name])
         else:
@@ -127,6 +130,7 @@ class MonitoringRepository:
                 FROM reporting.monitoring_file mf
                 WHERE lower(mf.agency_slug) = lower(%s)
                   AND mf.file_name = %s
+                ORDER BY mf.is_suppressed ASC, mf.id DESC
             """
             rows = self._db.execute_query(sql, [internal_slug, file_name])
 
@@ -148,6 +152,7 @@ class MonitoringRepository:
                     FROM reporting.monitoring_file mf
                     WHERE lower(mf.agency_slug) = lower(%s)
                       AND mf.file_name = %s
+                    ORDER BY mf.is_suppressed ASC, mf.id DESC
                 """
                 rows = self._db.execute_query(slug_sql, [agency_slug, file_name])
             else:
@@ -169,7 +174,7 @@ class MonitoringRepository:
                         mf.is_suppressed
                     FROM reporting.monitoring_file mf
                     WHERE mf.file_name = %s
-                    ORDER BY mf.id DESC
+                    ORDER BY mf.is_suppressed ASC, mf.id DESC
                     LIMIT 1
                 """
                 fallback_rows = self._db.execute_query(fallback_sql, [file_name])
@@ -199,7 +204,39 @@ class MonitoringRepository:
 
             return None
 
-        row = rows[0]
+        # Determine the best matching row if multiple are found
+        selected_row = rows[0]
+
+        if s3_key and len(rows) > 1:
+            # Filter rows where s3_url ends with the provided s3_key
+            # The database s3_url might contain the bucket prefix or just the path.
+            # We treat s3_key as the suffix we are looking for.
+            search_suffix = s3_key.strip().lstrip("/")
+            matches = []
+            for r in rows:
+                db_url = (r.get("s3_url") or "").strip()
+                # Check for suffix match. Be careful of cases where db_url is empty.
+                if db_url and (db_url == search_suffix or db_url.endswith("/" + search_suffix)):
+                    matches.append(r)
+
+            if matches:
+                # If we found matches matching the key, use the first one (respecting sort order: not-suppressed first)
+                selected_row = matches[0]
+                if len(matches) > 1:
+                    logger.debug(
+                        "Found %d rows ending with s3_key='%s'; selected id=%s",
+                        len(matches),
+                        s3_key,
+                        selected_row["id"]
+                    )
+            else:
+                logger.debug(
+                    "No rows matched s3_key='%s' suffix; falling back to top ranked row id=%s",
+                    s3_key,
+                    selected_row["id"]
+                )
+
+        row = selected_row
         # Check for s3_url match if available?
         # The user requested: "take the agency_id and the event key and query the s3_url for a match."
         # Since we don't have agency_id in this context easily (we have slugs), we can try to validate s3_url

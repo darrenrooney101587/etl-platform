@@ -100,18 +100,30 @@ def entrypoint(argv: List[str]) -> int:
         help="Run without persisting changes to the database",
     )
 
-    # Configure basic logging to ensuring INFO logs appear on stdout
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True,  # Ensure we override any existing config if this entrypoint is called
+    parser.add_argument(
+        "--trace-id",
+        help="Optional trace ID for logging context",
+        default=None
     )
+
+    # Configure basic logging to ensuring INFO logs appear on stdout
+    # Only force configuration if we are the main script execution.
+    # When called from sns_main, we reuse the existing logger configuration.
+    is_main_script = __name__ == "__main__" or "file_processing.jobs.s3_data_quality_job" in str(argv)
+
+    # Check if handlers are already configured (e.g. by sns_main)
+    if is_main_script and not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
 
     try:
         args = parser.parse_args(argv)
     except SystemExit:
-        # argparse calls sys.exit(), catch it to return int
         return 2
+
+    trace_prefix = f"[{args.trace_id}] " if args.trace_id else ""
 
     try:
         # Parse the AWS S3 event JSON
@@ -168,7 +180,7 @@ def entrypoint(argv: List[str]) -> int:
 
         failure_count = 0
         for i, event in enumerate(s3_events):
-            logger.info("Processing s3://%s/%s", event.bucket, event.key)
+            logger.info("%sProcessing s3://%s/%s", trace_prefix, event.bucket, event.key)
 
             try:
                 result = processor.process_s3_event(event)
@@ -179,31 +191,33 @@ def entrypoint(argv: List[str]) -> int:
                 passed = getattr(result, "passed", True)
                 if not passed:
                     logger.error(
-                        "Processing completed but reported failure for %s (score=%s)",
+                        "%sProcessing completed but reported failure for %s (score=%s)",
+                        trace_prefix,
                         event.key,
                         getattr(result, "score", "N/A"),
                     )
                     failure_count += 1
                 else:
                     logger.info(
-                        "Success: %s (Quality Score: %s)",
+                        "%sSuccess: %s (Quality Score: %s)",
+                        trace_prefix,
                         event.key,
                         getattr(result, "score", "N/A"),
                     )
 
             except Exception as e:
-                logger.exception("Failed to process object %s", event.key)
+                logger.exception("%sFailed to process object %s", trace_prefix, event.key)
                 failure_count += 1
 
         if failure_count > 0:
-            logger.error("Job completed with %d failure(s)", failure_count)
+            logger.error("%sJob completed with %d failure(s)", trace_prefix, failure_count)
             return 1
 
-        logger.info("Job completed successfully")
+        logger.info("%sJob completed successfully", trace_prefix)
         return 0
 
     except Exception as e:
-        logger.exception("Unexpected error in main job execution: %s", e)
+        logger.exception("%sUnexpected error in main job execution: %s", trace_prefix, e)
         return 1
 
 

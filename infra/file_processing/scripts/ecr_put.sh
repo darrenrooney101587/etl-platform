@@ -7,6 +7,8 @@ ECR_REPO_NAME="file-processing"
 
 # Determine repo root (two levels up from infra/file_processing/scripts)
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
+# Terraform dir for this stack
+TF_DIR="${REPO_ROOT}/infra/file_processing/terraform"
 DOCKERFILE_PATH="${REPO_ROOT}/docker/file-processing.Dockerfile"
 BUILD_CONTEXT="${REPO_ROOT}"
 
@@ -57,4 +59,6 @@ docker buildx build \
   "${BUILD_CONTEXT}"
 
 echo "Image pushed to: ${IMAGE_URI}"
-echo "container_image = \"${IMAGE_URI}\"" > "${REPO_ROOT}/infra/file_processing/container_image.txt"
+# Write to TF_DIR so manage.sh can read it
+mkdir -p "${TF_DIR}"
+echo "container_image = \"${IMAGE_URI}\"" > "${TF_DIR}/container_image.txt"

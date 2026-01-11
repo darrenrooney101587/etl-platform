@@ -149,3 +149,9 @@ variable "db_password" {
   default     = ""
   sensitive   = true
 }
+
+variable "oidc_thumbprint" {
+  description = "Thumbprint (SHA1 hex) for the EKS OIDC provider certificate (compute with openssl)."
+  type        = string
+  default     = ""
+}

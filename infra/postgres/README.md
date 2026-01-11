@@ -4,7 +4,7 @@ Usage (example):
 
 ```hcl
 module "on_demand_postgres" {
-  source = "./infra/postgres_on_demand"
+  source = "./infra/postgres"
 
   aws_region   = "us-gov-west-1"
   environment  = "dev-on-demand"
@@ -20,12 +20,17 @@ module "on_demand_postgres" {
 Quick steps:
 
 1. Ensure your AWS credentials are configured in the environment (profile or env vars).
-2. From the repository root run:
+2. From the repository root run Terraform against the `terraform` subdirectory for this stack:
 
 ```bash
-cd infra/postgres_on_demand
+# option A: use -chdir
+terraform -chdir=infra/postgres/terraform init
+terraform -chdir=infra/postgres/terraform apply
+
+# option B: cd into the terraform folder
+cd infra/postgres/terraform
 terraform init
-terraform apply
+terraform apply -auto-approve
 ```
 
 3. On success Terraform will output `db_endpoint`, `db_port`, `db_username`, and `db_password` (if generated).
@@ -35,4 +40,3 @@ Notes and warnings:
 - This module is intentionally opinionated to be simple: it can create a minimal VPC and subnets if you don't provide an existing VPC/subnets.
 - It is designed for **ad-hoc** use; it sets `skip_final_snapshot = true` and `deletion_protection = false` for convenience. Be cautious when using in production.
 - The RDS instance is created with `engine_version = "15.4"` (Postgres 15). You can change this in `main.tf` if you need a specific minor version.
-- Adjust security rules and subnet selection for your organization's networking/security policies before opening to external access.

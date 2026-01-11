@@ -7,7 +7,7 @@ NAMESPACE=${NAMESPACE:-file-processing}
 LABEL=${LABEL:-app=file-processing-sns}
 TIMEOUT=${TIMEOUT:-30}
 
-TF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/infra/file_processing"
+TF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/infra/file_processing/terraform"
 
 # Topic ARN from Terraform output (fallback to env override)
 TOPIC_ARN=${SNS_TOPIC_ARN:-$(terraform -chdir="$TF_DIR" output -raw sns_topic_arn 2>/dev/null || true)}

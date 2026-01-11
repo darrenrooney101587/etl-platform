@@ -1,0 +1,17 @@
+services:
+  localstack:
+    image: localstack/localstack:1.4
+    container_name: localstack
+    environment:
+      - SERVICES=sns,s3
+      - DEBUG=1
+      - DATA_DIR=/var/lib/localstack/data
+    ports:
+      - "4566:4566" # LocalStack edge port
+    volumes:
+      - ./localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+
+# Notes:
+# - LocalStack exposes an "edge" API on port 4566 for all services.
+# - Use AWS CLI with --endpoint-url http://localhost:4566 when talking to LocalStack.

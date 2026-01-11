@@ -8,6 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)"
 STACK_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Terraform working directory for this stack lives under infra/file_processing/terraform
+TF_DIR="${STACK_DIR}/terraform"
 COMMAND="${1:-help}"
 NAMESPACE="file-processing"
 DEPLOYMENT_NAME="file-processing-sns"
@@ -31,31 +33,31 @@ if [[ "$COMMAND" == "help" || "$COMMAND" == "-h" ]]; then
   exit 0
 fi
 
-cd "$STACK_DIR"
-
+# Use terraform -chdir so we don't need to change working directory for terraform commands
 case "$COMMAND" in
   init)
-    terraform init
+    terraform -chdir="$TF_DIR" init
     ;;
   plan)
-    terraform init
-    terraform plan
+    terraform -chdir="$TF_DIR" init
+    terraform -chdir="$TF_DIR" plan
     ;;
   apply)
-    terraform init
-    terraform apply -auto-approve
+    terraform -chdir="$TF_DIR" init
+    terraform -chdir="$TF_DIR" apply -auto-approve
     ;;
   destroy)
-    terraform init
-    terraform destroy -auto-approve
+    terraform -chdir="$TF_DIR" init
+    terraform -chdir="$TF_DIR" destroy -auto-approve
     ;;
   update-image)
     # Build and push image
-    terraform init
-    ./scripts/ecr_put.sh
-    IMAGE_URI=$(sed -n 's/container_image = "\([^"]*\)"/\1/p' container_image.txt || true)
+    terraform -chdir="$TF_DIR" init
+    # Run the ECR helper from the scripts directory so invocation works from any cwd
+    "$SCRIPT_DIR/ecr_put.sh"
+    IMAGE_URI=$(sed -n 's/container_image = "\([^"]*\)"/\1/p' "$TF_DIR/container_image.txt" || true)
     if [[ -z "$IMAGE_URI" ]]; then
-      echo "Error: could not read image URI from container_image.txt"
+      echo "Error: could not read image URI from $TF_DIR/container_image.txt"
       exit 1
     fi
 
@@ -67,13 +69,20 @@ case "$COMMAND" in
       kubectl -n "$NAMESPACE" set image deployment/"$DEPLOYMENT_NAME" sns-listener="$IMAGE_URI"
       echo "Waiting for rollout to complete..."
       kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME"
+
+      # Force a rollout restart to ensure pods pick up a newly pushed image tag even when the
+      # podTemplate image string did not change (e.g. you pushed a new :latest with the same literal image ref).
+      # This guarantees pod AGE will update after update-image.
+      echo "Ensuring pods are restarted to pick up image (rollout restart)..."
+      kubectl -n "$NAMESPACE" rollout restart deployment/"$DEPLOYMENT_NAME"
+      kubectl -n "$NAMESPACE" rollout status deployment/"$DEPLOYMENT_NAME"
     else
       echo "Deployment not found — running terraform apply to create resources"
-      terraform apply -auto-approve -var="image=$IMAGE_URI"
+      terraform -chdir="$TF_DIR" apply -auto-approve -var="image=$IMAGE_URI"
     fi
     ;;
   outputs)
-    terraform output
+    terraform -chdir="$TF_DIR" output
     ;;
   *)
     echo "Unknown command: $COMMAND"

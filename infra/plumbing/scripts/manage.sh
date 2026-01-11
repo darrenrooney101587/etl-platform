@@ -8,6 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STACK_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Terraform dir under the stack
+TF_DIR="${STACK_DIR}/terraform"
 COMMAND="${1:-help}"
 
 function print_usage() {
@@ -26,26 +28,24 @@ if [[ "$COMMAND" == "help" || "$COMMAND" == "-h" ]]; then
   exit 0
 fi
 
-cd "$STACK_DIR"
-
 case "$COMMAND" in
   init)
-    terraform init
+    terraform -chdir="$TF_DIR" init
     ;;
   plan)
-    terraform init
-    terraform plan
+    terraform -chdir="$TF_DIR" init
+    terraform -chdir="$TF_DIR" plan
     ;;
   apply)
-    terraform init
-    terraform apply -auto-approve
+    terraform -chdir="$TF_DIR" init
+    terraform -chdir="$TF_DIR" apply -auto-approve
     ;;
   destroy)
-    terraform init
-    terraform destroy -auto-approve
+    terraform -chdir="$TF_DIR" init
+    terraform -chdir="$TF_DIR" destroy -auto-approve
     ;;
   output)
-    terraform output
+    terraform -chdir="$TF_DIR" output
     ;;
   *)
     echo "Unknown command: $COMMAND"

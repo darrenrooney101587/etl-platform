@@ -11,12 +11,12 @@ if git -C "$SCRIPT_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
   REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 else
   # Script lives at: <repo-root>/infra/file_processing/scripts
-  # so go up three levels to reach repo root
-  REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  # go up three levels to reach repo root
+  REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 fi
 
-# Terraform directory for the file_processing infra (repo-root/infra/file_processing)
-TF_DIR="$REPO_ROOT/infra/file_processing"
+# Terraform directory for the file_processing infra (repo-root/infra/file_processing/terraform)
+TF_DIR="$REPO_ROOT/infra/file_processing/terraform"
 
 echo "Repo root: $REPO_ROOT"
 echo "Terraform dir: $TF_DIR"
@@ -35,11 +35,12 @@ if [ "$COLON_COUNT" -lt 5 ]; then
   exit 1
 fi
 
-TMP_MSG_FILE="$(mktemp /tmp/sns-msg.XXXXXX.json)"
-trap 'rm -f "$TMP_MSG_FILE"' EXIT
+TMP_MSG_FILE="$(mktemp 2>/dev/null || mktemp /tmp/sns-msg.XXXXXX)"
+# Ensure we remove the temp file on exit (safe no-op if file already removed)
+trap 'rm -f "$TMP_MSG_FILE" >/dev/null 2>&1 || true' EXIT
 
 cat > "$TMP_MSG_FILE" <<'JSON'
-{"Records":[{"eventVersion":"2.1","eventSource":"aws:s3","awsRegion":"us-gov-west-1","eventTime":"2026-01-09T16:48:19.000Z","eventName":"ObjectCreated:Put","s3":{"s3SchemaVersion":"1.0","configurationId":"ConfigId","bucket":{"name":"etl-ba-research-client-etl","arn":"arn:aws-us-gov:s3:::etl-ba-research-client-etl"},"object":{"key":"from_client/nm_albuquerque/Officer_Detail.csv","size":12345,"eTag":"abcd1234","sequencer":"0123456789"}}}]}
+{"Records":[{"eventVersion":"2.1","eventSource":"aws:s3","awsRegion":"us-gov-west-1","eventTime":"2026-01-09T16:48:19.000Z","eventName":"ObjectCreated:Put","s3":{"s3SchemaVersion":"1.0","configurationId":"ConfigId","bucket":{"name":"etl-ba-research-client-etl","arn":"arn:aws-us-gov:s3:::etl-ba-research-client-etl"},"object":{"key":"from_client/nm_albuquerque/organizations/Officer_Detail.csv","size":12345,"eTag":"abcd1234","sequencer":"0123456789"}}}]}
 JSON
 
 echo "Publishing SNS message to: $SNS_TOPIC_ARN"

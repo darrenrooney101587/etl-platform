@@ -20,16 +20,76 @@ from __future__ import annotations
 import json
 import logging
 import os
-import threading
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
 from urllib.request import urlopen
+import threading
+import time
+from typing import Optional as TypingOptional
 
 # Import the correct entrypoint within the file_processing package
 from file_processing.jobs.s3_data_quality_job import entrypoint
 
 
 logger = logging.getLogger(__name__)
+
+
+class CircuitBreaker:
+    """Simple thread-safe circuit breaker.
+
+    - Activates after `max_failures` consecutive failures.
+    - Remains active for `cooldown_seconds` since last failure. When cooldown
+      elapses, breaker resets and processing resumes.
+
+    Behavior note: by default the SNS handler will return HTTP 200 and
+    *skip* processing while the breaker is active to avoid retry storms
+    from SNS. If you prefer retries from SNS, change the handler to return
+    5xx instead.
+    """
+
+    def __init__(self, max_failures: int, cooldown_seconds: int, logger: logging.Logger) -> None:
+        self.max_failures = max_failures
+        self.cooldown_seconds = cooldown_seconds
+        self.consecutive_failures = 0
+        self.last_failure_time: TypingOptional[float] = None
+        self.active = False
+        self._lock = threading.Lock()
+        self.logger = logger
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self.consecutive_failures += 1
+            self.last_failure_time = time.time()
+            self.logger.warning("CircuitBreaker: recorded failure (%d/%d)", self.consecutive_failures, self.max_failures)
+            if self.consecutive_failures >= self.max_failures:
+                if not self.active:
+                    self.active = True
+                    self.logger.error(
+                        "Circuit breaker activated after %d consecutive failures",
+                        self.max_failures,
+                    )
+
+    def record_success(self) -> None:
+        with self._lock:
+            if self.consecutive_failures > 0 or self.active:
+                self.logger.info("CircuitBreaker: success observed, resetting state")
+            self.consecutive_failures = 0
+            self.last_failure_time = None
+            self.active = False
+
+    def is_active(self) -> bool:
+        with self._lock:
+            if self.active and self.last_failure_time is not None:
+                # If cooldown has passed, reset and return False
+                if (time.time() - self.last_failure_time) >= self.cooldown_seconds:
+                    self.logger.info("CircuitBreaker: cooldown elapsed; resetting")
+                    self.consecutive_failures = 0
+                    self.last_failure_time = None
+                    self.active = False
+                    return False
+                return True
+            return False
 
 
 class SNSRequestHandler(BaseHTTPRequestHandler):
@@ -61,6 +121,41 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_GET(self) -> None:  # health endpoints
+        # Admin endpoint to inspect/reset circuit breaker (dev only)
+        if self.path == "/breaker":
+            server = getattr(self, 'server', None)
+            circuit_breaker = getattr(server, "circuit_breaker", None)
+            if circuit_breaker is None:
+                self._send_json_response(404, {"error": "no circuit breaker"})
+                return
+            # Compute cooldown remaining if active
+            last = circuit_breaker.last_failure_time
+            cooldown_remaining = None
+            if last is not None:
+                try:
+                    cooldown_remaining = max(0, circuit_breaker.cooldown_seconds - (time.time() - last))
+                except Exception:
+                    cooldown_remaining = None
+
+            resp = {
+                "active": bool(circuit_breaker.active),
+                "consecutive_failures": circuit_breaker.consecutive_failures,
+                "last_failure_time": circuit_breaker.last_failure_time,
+                "cooldown_remaining": cooldown_remaining,
+            }
+            self._send_json_response(200, resp)
+            return
+
+        if self.path == "/breaker/reset":
+            server = getattr(self, 'server', None)
+            circuit_breaker = getattr(server, "circuit_breaker", None)
+            if circuit_breaker is None:
+                self._send_json_response(404, {"error": "no circuit breaker"})
+                return
+            circuit_breaker.record_success()
+            self._send_json_response(200, {"status": "reset"})
+            return
+
         if self.path in ("/", "/healthz"):
             logger.debug("Health check received: %s", self.path)
             self._send_json_response(200, {"status": "ok"})
@@ -68,6 +163,43 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
 
         # For any other GET, return 404
         self._send_json_response(404, {"error": "not found"})
+
+    def do_HEAD(self) -> None:
+        """Respond to HEAD requests with the same status as GET but no body.
+
+        Some HTTP clients (including `curl -I`) use HEAD to probe the endpoint.
+        BaseHTTPRequestHandler does not implement do_HEAD by default which
+        results in a 501. Implementing do_HEAD avoids that and keeps health
+        checks from failing.
+        """
+        # Mirror the GET health-check responses but do not write a body.
+        if self.path in ("/", "/healthz"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+
+        if self.path == "/breaker":
+            server = getattr(self, 'server', None)
+            circuit_breaker = getattr(server, "circuit_breaker", None)
+            if circuit_breaker is None:
+                self.send_response(404)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+
+        # Other HEADs: 404
+        self.send_response(404)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_POST(self) -> None:
         # Read and parse incoming SNS HTTP POST body
@@ -122,10 +254,36 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
 
             # At this point we have a decoded S3 event JSON ready to forward
             logger.info("SNS Notification received; forwarding inner S3 event")
-            # Acknowledge immediately and process in background to keep HTTP response quick
+            # Acknowledge immediately and submit to the server's executor to keep HTTP response quick
             event_json_str = json.dumps(decoded_message)
-            threading.Thread(target=self._run_job, args=(event_json_str,), daemon=True).start()
-            self._send_json_response(200, {"status": "accepted"})
+            try:
+                # Attach executor to the HTTPServer instance in main(); use it if present.
+                server = getattr(self, 'server', None)
+                executor = getattr(server, "executor", None)
+                if executor is not None:
+                    # Generate a short trace ID
+                    import uuid
+                    trace_id = str(uuid.uuid4())[:8]
+
+                    # Check circuit breaker before submitting the job
+                    circuit_breaker = getattr(server, "circuit_breaker", None)
+                    if circuit_breaker is not None and circuit_breaker.is_active():
+                        logger.warning("[%s] CircuitBreaker is active; skipping job submission", trace_id)
+                        self._send_json_response(200, {"status": "skipped"})
+                        return
+
+                    executor.submit(self._run_job, event_json_str, trace_id)
+                else:
+                    # Fallback to daemon thread if executor not set (very unlikely)
+                    import threading as _threading
+                    import uuid
+                    trace_id = str(uuid.uuid4())[:8]
+                    _threading.Thread(target=self._run_job, args=(event_json_str, trace_id), daemon=True).start()
+
+                self._send_json_response(200, {"status": "accepted"})
+            except Exception:
+                logger.exception("Failed to submit job to executor")
+                self._send_json_response(500, {"error": "executor error"})
 
         except Exception as exc:
             logger.exception("Unhandled error processing SNS Notification: %s", exc)
@@ -154,37 +312,74 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
 
         self._send_json_response(200, {"status": "subscription_confirmed"})
 
-    def _run_job(self, event_json: str) -> None:
+    def _run_job(self, event_json: str, trace_id: str = "") -> None:
         """Invoke the existing job entrypoint with the decoded S3 event JSON.
 
         We pass the event JSON as the value for --event-json. The job's entrypoint
         is expected to accept the same CLI flag used interactively.
         """
+        circuit_breaker = getattr(self, 'server', None)
+        circuit_breaker = getattr(circuit_breaker, "circuit_breaker", None)
         try:
             argv = ["--event-json", event_json]
-            logger.info("Starting s3_data_quality_job for SNS message")
+            if trace_id:
+                argv.extend(["--trace-id", trace_id])
+
+            logger.info("[%s] Starting s3_data_quality_job for SNS message", trace_id)
             ret = entrypoint(argv)
             if ret != 0:
-                logger.error("s3_data_quality_job returned non-zero exit code: %s", ret)
+                logger.error("[%s] s3_data_quality_job returned non-zero exit code: %s", trace_id, ret)
+                if circuit_breaker is not None:
+                    circuit_breaker.record_failure()
             else:
-                logger.info("s3_data_quality_job completed successfully")
+                logger.info("[%s] s3_data_quality_job completed successfully", trace_id)
+                if circuit_breaker is not None:
+                    circuit_breaker.record_success()
         except SystemExit as e:
             # entrypoint may call sys.exit(); log and continue
-            logger.error("s3_data_quality_job exited with SystemExit: %s", e)
+            logger.error("[%s] s3_data_quality_job exited with SystemExit: %s", trace_id, e)
+            if circuit_breaker is not None:
+                circuit_breaker.record_failure()
         except Exception:
-            logger.exception("s3_data_quality_job crashed")
+            logger.exception("[%s] s3_data_quality_job crashed", trace_id)
+            if circuit_breaker is not None:
+                circuit_breaker.record_failure()
 
 
 def main() -> None:
     port = int(os.getenv("PORT", "8080"))
     server_address = ("", port)
     httpd = HTTPServer(server_address, SNSRequestHandler)
+
+    # Configure a bounded thread pool for background job processing. Default to 10 workers.
+    try:
+        max_workers = int(os.getenv("SNS_WORKER_MAX", "10"))
+    except Exception:
+        max_workers = 10
+    httpd.executor = ThreadPoolExecutor(max_workers=max_workers)
+
+    # Configure circuit breaker parameters
+    try:
+        circuit_breaker_max_failures = int(os.getenv("CIRCUIT_BREAKER_MAX_FAILURES", "5"))
+        circuit_breaker_cooldown_seconds = int(os.getenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", "60"))
+    except Exception:
+        circuit_breaker_max_failures = 5
+        circuit_breaker_cooldown_seconds = 60
+
+    # Attach a CircuitBreaker instance to the server
+    httpd.circuit_breaker = CircuitBreaker(circuit_breaker_max_failures, circuit_breaker_cooldown_seconds, logger)
+
     logging.basicConfig(level=logging.INFO)
-    logger.info("Starting SNS listener on port %s...", port)
+    logger.info("Starting SNS listener on port %s with max_workers=%d...", port, max_workers)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         logger.info("Stopping SNS listener.")
+        # Shutdown executor to stop accepting new tasks and attempt graceful shutdown
+        try:
+            httpd.executor.shutdown(wait=False)
+        except Exception:
+            logger.exception("Failed to shutdown executor cleanly")
         httpd.server_close()
 
 

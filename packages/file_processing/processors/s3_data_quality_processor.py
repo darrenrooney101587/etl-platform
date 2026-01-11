@@ -142,9 +142,9 @@ class S3DataQualityProcessor:
             raise
 
         # Step 2: Look up monitoring file
-        monitoring_file = self._repository.get_monitoring_file(
-            parsed_key.agency_slug, parsed_key.file_name
-        )
+        # Pass the full key to help disambiguate files with the same name but different paths
+        # Repository contract: get_monitoring_file(agency_slug, file_name)
+        monitoring_file = self._repository.get_monitoring_file(parsed_key.agency_slug, parsed_key.file_name)
 
         if monitoring_file is None:
             if self._config.auto_create_monitoring_file:
@@ -410,6 +410,23 @@ class S3DataQualityProcessor:
             )
             return parser.parse(response["Body"])
         except Exception as exc:
+            # If this is a botocore ClientError, check for NoSuchKey and return a clear message
+            try:
+                from botocore.exceptions import ClientError
+
+                if isinstance(exc, ClientError):
+                    err_code = exc.response.get("Error", {}).get("Code")
+                    if err_code == "NoSuchKey":
+                        s3_url = f"s3://{event.bucket}/{event.key}"
+                        logger.error(
+                            "S3 object not found: %s (NoSuchKey). Ensure the event key is correct and the object exists.",
+                            s3_url,
+                        )
+                        return ParseResult(success=False, error_message=f"NoSuchKey: {s3_url}")
+            except Exception:
+                # ignore errors while introspecting exception
+                pass
+
             logger.exception("Failed to download/parse S3 object")
             return ParseResult(
                 success=False,

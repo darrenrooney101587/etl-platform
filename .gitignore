@@ -148,3 +148,5 @@ cython_debug/
 crash.log
 
 *.txt
+/infra/local/localstack_data/
+/infra/file_processing/terraform/tfplan

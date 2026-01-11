@@ -202,14 +202,23 @@ resource "kubernetes_namespace_v1" "ns" {
   depends_on = [aws_eks_node_group.this]
 }
 
+# NOTE: The IAM Role for the Kubernetes ServiceAccount and its S3 policy are defined
+# in `irsa.tf` (aws_iam_role.file_processing_sa and aws_iam_role_policy_attachment.file_processing_s3_attach).
+# We intentionally do not recreate them here to avoid duplicate resource conflicts.
+
 resource "kubernetes_service_account_v1" "sa" {
   metadata {
     name        = var.service_account_name
     namespace   = var.create_namespace ? kubernetes_namespace_v1.ns[0].metadata[0].name : var.namespace
-    annotations = var.annotations
+    annotations = merge(
+      var.annotations,
+      {
+        "eks.amazonaws.com/role-arn" = aws_iam_role.file_processing_sa.arn
+      }
+    )
   }
 
-  depends_on = [aws_eks_node_group.this]
+  depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.file_processing_s3_attach]
 }
 
 resource "kubernetes_deployment_v1" "sns_listener" {
@@ -276,6 +285,17 @@ resource "kubernetes_deployment_v1" "sns_listener" {
           env {
             name  = "DB_PASSWORD"
             value = var.db_password
+          }
+
+          # IRSA web identity variables so boto3/botocore can pick up credentials
+          env {
+            name  = "AWS_ROLE_ARN"
+            value = aws_iam_role.file_processing_sa.arn
+          }
+
+          env {
+            name  = "AWS_WEB_IDENTITY_TOKEN_FILE"
+            value = "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
           }
         }
       }
