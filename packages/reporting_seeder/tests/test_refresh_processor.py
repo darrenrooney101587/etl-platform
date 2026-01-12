@@ -1,13 +1,13 @@
 import unittest
 from typing import Any, Dict, List
 
+from etl_core.support.circuit_breaker import CircuitBreaker
+from etl_core.support.executor import ParallelExecutor
 from reporting_seeder.processors.refresh import RefreshProcessor
 from reporting_seeder.repositories.history import HistoryRepository
 from reporting_seeder.repositories.manifests import ManifestRepository
 from reporting_seeder.repositories.materialized_views import MaterializedViewRepository
-from reporting_seeder.services.circuit_breaker import CircuitBreaker
 from reporting_seeder.services.config import SeederConfig
-from reporting_seeder.services.executor import ParallelExecutor
 
 
 class _FakeManifestRepo(ManifestRepository):

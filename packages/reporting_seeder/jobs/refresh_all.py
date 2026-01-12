@@ -17,7 +17,7 @@ def entrypoint(argv: List[str]) -> int:
     config = SeederConfig.from_env()
     db_client = DatabaseClient()
     manifest_repo = ManifestRepository(db_client)
-    history_repo = HistoryRepository(db_client)
+    history_repo = HistoryRepository()
     mv_repo = MaterializedViewRepository(db_client)
     circuit_breaker = CircuitBreaker(
         max_failures=config.max_failures,

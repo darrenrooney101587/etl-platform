@@ -1,66 +1,89 @@
-"""Repository for recording refresh history and metrics."""
+"""Repository for recording refresh history and metrics using Django ORM.
+
+This implementation uses the upstream models from
+`etl_database_schema.apps.reporting.models` and performs ORM operations.
+Django must be configured (set DJANGO_SETTINGS_MODULE and call django.setup())
+before instantiating or using this repository.
+"""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from packages.etl_core.database.client import DatabaseClient
-
 
 class HistoryRepository:
-    def __init__(self, db_client: DatabaseClient) -> None:
-        self._db = db_client
+    """Django ORM-backed repository for seeder run history and job status.
+
+    Usage:
+        from reporting_seeder.django_bootstrap import bootstrap_django
+        bootstrap_django('reporting_models.settings')
+        repo = HistoryRepository()
+        repo.record_start(run_id, manifest)
+
+    Note: This class intentionally does NOT provide an SQL fallback. If Django
+    or the upstream models are unavailable a RuntimeError will be raised with
+    instructions to bootstrap the ORM.
+    """
+
+    def __init__(self) -> None:
+        # no constructor args; repository always uses ORM models
+        pass
+
+    def _ensure_models(self):
+        """Import and return the two ORM models we need.
+
+        Returns:
+            (SeederRunHistory, SeederJobStatus)
+
+        Raises:
+            RuntimeError: if Django or the models are not available. The
+            message explains how to bootstrap Django for callers.
+        """
+        try:
+            from etl_database_schema.apps.reporting.models import (
+                SeederRunHistory,
+                SeederJobStatus,
+            )
+            return SeederRunHistory, SeederJobStatus
+        except Exception as exc:  # pragma: no cover - runtime dependency
+            raise RuntimeError(
+                "Django ORM models are not available. Ensure DJANGO_SETTINGS_MODULE "
+                "is set and django.setup() has been called (for example via "
+                "reporting_seeder.django_bootstrap.bootstrap_django).") from exc
 
     def record_start(self, run_id: str, manifest: Dict[str, object]) -> None:
+        SeederRunHistory, SeederJobStatus = self._ensure_models()
+        # Deferred import of timezone to avoid importing Django at module import
+        from django.utils import timezone  # type: ignore
+
         manifest_id = int(manifest["id"])
-        # Insert history
-        sql_history = """
-        INSERT INTO reporting.seeder_run_history (
-            run_id, manifest_id, table_name, report_name, agency_id, agency_slug, report_type,
-            status, start_time, consecutive_failures
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 'running', now(), COALESCE(%s, 0))
-        """
-        self._db.execute_query(
-            sql_history,
-            [
-                run_id,
-                manifest_id,
-                manifest.get("table_name"),
-                manifest.get("report_name"),
-                manifest.get("agency_id"),
-                manifest.get("agency_slug"),
-                manifest.get("report_type"),
-                manifest.get("consecutive_failures", 0),
-            ],
+
+        SeederRunHistory.objects.create(
+            run_id=run_id,
+            manifest_id=manifest_id,
+            table_name=manifest.get("table_name"),
+            report_name=manifest.get("report_name"),
+            agency_id=manifest.get("agency_id"),
+            agency_slug=manifest.get("agency_slug"),
+            report_type=manifest.get("report_type"),
+            status="running",
+            start_time=timezone.now(),
+            consecutive_failures=manifest.get("consecutive_failures", 0),
         )
 
-        # Upsert status
-        sql_status = """
-        INSERT INTO reporting.seeder_job_status (
-            manifest_id, table_name, report_name, report_type, agency_id, agency_slug,
-            status, start_time, last_run_id, consecutive_failures, updated_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, 'running', now(), %s, COALESCE(%s, 0), now())
-        ON CONFLICT (table_name) DO UPDATE SET
-            status = EXCLUDED.status,
-            start_time = EXCLUDED.start_time,
-            last_run_id = EXCLUDED.last_run_id,
-            updated_at = EXCLUDED.updated_at
-        """
-        self._db.execute_query(
-            sql_status,
-            [
-                manifest_id,
-                manifest.get("table_name"),
-                manifest.get("report_name"),
-                manifest.get("report_type"),
-                manifest.get("agency_id"),
-                manifest.get("agency_slug"),
-                run_id,
-                manifest.get("consecutive_failures", 0),
-            ],
-        )
+        defaults = {
+            "manifest_id": manifest_id,
+            "report_name": manifest.get("report_name"),
+            "report_type": manifest.get("report_type"),
+            "agency_id": manifest.get("agency_id"),
+            "agency_slug": manifest.get("agency_slug"),
+            "status": "running",
+            "start_time": timezone.now(),
+            "last_run_id": run_id,
+            "consecutive_failures": manifest.get("consecutive_failures", 0),
+            "updated_at": timezone.now(),
+        }
+        SeederJobStatus.objects.update_or_create(table_name=manifest.get("table_name"), defaults=defaults)
 
     def record_success(
         self,
@@ -72,84 +95,65 @@ class HistoryRepository:
         memory_usage_mb: int,
         cpu_percentage: int,
     ) -> None:
+        SeederRunHistory, SeederJobStatus = self._ensure_models()
+        from django.utils import timezone  # type: ignore
+
         manifest_id = int(manifest["id"])
-        # Update history
-        sql_history = """
-        UPDATE reporting.seeder_run_history
-        SET status = 'success',
-            finish_time = now(),
-            duration_seconds = %s,
-            records_processed = %s,
-            bytes_processed = %s,
-            memory_usage_mb = %s,
-            cpu_percentage = %s,
-            consecutive_failures = 0
-        WHERE run_id = %s AND manifest_id = %s
-        """
-        self._db.execute_query(
-            sql_history,
-            [
-                duration_seconds,
-                records_processed,
-                bytes_processed,
-                memory_usage_mb,
-                cpu_percentage,
-                run_id,
-                manifest_id,
-            ],
+        SeederRunHistory.objects.filter(run_id=run_id, manifest_id=manifest_id).update(
+            status="success",
+            finish_time=timezone.now(),
+            duration_seconds=duration_seconds,
+            records_processed=records_processed,
+            bytes_processed=bytes_processed,
+            memory_usage_mb=memory_usage_mb,
+            cpu_percentage=cpu_percentage,
+            consecutive_failures=0,
         )
 
-        # Update status
-        sql_status = """
-        UPDATE reporting.seeder_job_status
-        SET status = 'success',
-            duration_seconds = %s,
-            consecutive_failures = 0,
-            last_errors = NULL,
-            updated_at = now()
-        WHERE table_name = %s
-        """
-        self._db.execute_query(sql_status, [duration_seconds, manifest.get("table_name")])
+        SeederJobStatus.objects.filter(table_name=manifest.get("table_name")).update(
+            status="success",
+            duration_seconds=duration_seconds,
+            consecutive_failures=0,
+            last_errors=None,
+            updated_at=timezone.now(),
+        )
 
     def record_error(self, run_id: str, manifest: Dict[str, object], errors: str) -> None:
-        manifest_id = int(manifest["id"])
-        # Update history
-        sql_history = """
-        UPDATE reporting.seeder_run_history
-        SET status = 'error',
-            finish_time = now(),
-            errors = %s,
-            consecutive_failures = COALESCE(consecutive_failures, 0) + 1
-        WHERE run_id = %s AND manifest_id = %s
-        """
-        self._db.execute_query(sql_history, [errors, run_id, manifest_id])
+        SeederRunHistory, SeederJobStatus = self._ensure_models()
+        from django.utils import timezone  # type: ignore
+        from django.db.models import F  # type: ignore
 
-        # Update status
-        sql_status = """
-        UPDATE reporting.seeder_job_status
-        SET status = 'error',
-            consecutive_failures = COALESCE(consecutive_failures, 0) + 1,
-            last_errors = %s,
-            updated_at = now()
-        WHERE table_name = %s
-        """
-        self._db.execute_query(sql_status, [errors, manifest.get("table_name")])
+        manifest_id = int(manifest["id"])
+        SeederRunHistory.objects.filter(run_id=run_id, manifest_id=manifest_id).update(
+            status="error",
+            finish_time=timezone.now(),
+            errors=errors,
+            consecutive_failures=F("consecutive_failures") + 1,
+        )
+
+        SeederJobStatus.objects.filter(table_name=manifest.get("table_name")).update(
+            status="error",
+            consecutive_failures=F("consecutive_failures") + 1,
+            last_errors=errors,
+            updated_at=timezone.now(),
+        )
 
     def list_recent_runs(self, limit: int = 100) -> List[Dict[str, Any]]:
-        sql = """
-        SELECT run_id,
-               manifest_id,
-               status,
-               start_time,
-               finish_time,
-               duration_seconds,
-               records_processed,
-               bytes_processed,
-               memory_usage_mb,
-               cpu_percentage,
-               errors
-        FROM reporting.seeder_run_history
-        ORDER BY start_time DESC
-        LIMIT %s
-        """
-        return self._db.execute_query(sql, [limit])
+        SeederRunHistory, _ = self._ensure_models()
+        qs = (
+            SeederRunHistory.objects.order_by("-start_time")
+            .values(
+                "run_id",
+                "manifest_id",
+                "status",
+                "start_time",
+                "finish_time",
+                "duration_seconds",
+                "records_processed",
+                "bytes_processed",
+                "memory_usage_mb",
+                "cpu_percentage",
+                "errors",
+            )[:limit]
+        )
+        return list(qs)

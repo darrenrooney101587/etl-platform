@@ -4,13 +4,27 @@ import unittest
 import uuid
 from typing import List, Dict, Any
 
+# Attempt to load a local .env file (packages/reporting_seeder/.env) for integration tests.
+# This keeps tests runnable locally without requiring manual env export when developers
+# keep a .env in the package directory.
+try:
+    from pathlib import Path
+    from dotenv import load_dotenv  # type: ignore
+
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+except Exception:
+    # dotenv isn't required; tests will still work if environment vars are exported.
+    pass
+
+from etl_core.support.circuit_breaker import CircuitBreaker
+from etl_core.support.executor import ParallelExecutor
 from packages.etl_core.database.client import DatabaseClient
 from reporting_seeder.repositories.manifests import ManifestRepository
 from reporting_seeder.repositories.materialized_views import MaterializedViewRepository
 from reporting_seeder.repositories.history import HistoryRepository
 from reporting_seeder.services.config import SeederConfig
-from reporting_seeder.services.circuit_breaker import CircuitBreaker
-from reporting_seeder.services.executor import ParallelExecutor
 from reporting_seeder.processors.refresh import RefreshProcessor
 
 
