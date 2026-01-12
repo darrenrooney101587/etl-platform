@@ -12,7 +12,7 @@ import time
 from typing import Optional
 import logging
 
-logger = logging.getLogger(__name__)
+module_logger = logging.getLogger(__name__)
 
 
 class CircuitBreaker:
@@ -52,8 +52,8 @@ class CircuitBreaker:
         self.last_failure_time: Optional[float] = None
         self.active = False
         self._opened_at: Optional[float] = None
-        # optional logger: prefer explicit logger arg, then logger_obj, then module logger
-        self._logger = logger or logger_obj or logger
+        # optional logger: prefer explicit logger arg, then logger_obj, then module_logger
+        self._logger = logger or logger_obj or module_logger
 
     # Backwards-compatible methods expected by older callers/tests
     def record_failure(self) -> None:

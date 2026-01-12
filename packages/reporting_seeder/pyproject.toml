@@ -9,7 +9,9 @@ packages = [{ include = "reporting_seeder" }]
 [tool.poetry.dependencies]
 python = "^3.10"
 etl-core = { path = "../etl_core", develop = false }
-psutil = "^5.9"
+# broaden psutil to accept versions required by upstream schema package; keep lower bound to avoid surprises
+psutil = ">=5.9,<8.0"
+etl-database-schema = { git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git", branch = "main" }
 
 [tool.poetry.scripts]
 reporting-seeder = "reporting_seeder.cli.main:main"
