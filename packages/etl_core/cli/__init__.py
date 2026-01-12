@@ -92,6 +92,16 @@ def main_for_package(prog: str, package_name: str) -> int:
     # package-scoped environment like LOCAL_S3_ROOT without global changes.
     _load_package_env(package_name)
 
+    # Ensure basic logging is configured for package-level CLI runs when no
+    # handlers are present. This guarantees that jobs invoked via
+    # `main_for_package(...)->run` will emit INFO logs to stdout by default
+    # (matching the behavior when running the job module directly).
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+
     parser = make_job_cli(prog)
     args = parser.parse_args()
 
