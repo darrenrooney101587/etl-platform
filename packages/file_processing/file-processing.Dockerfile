@@ -10,7 +10,7 @@ COPY packages/etl_core /app/packages/etl_core
 COPY packages/file_processing /app/packages/file_processing
 
 # Install only runtime Python dependencies via pip to avoid Poetry/build issues
-RUN pip install --no-cache-dir boto3 psycopg2-binary
+RUN pip install poetry
 
 # Default workdir for running the package
 WORKDIR /app
