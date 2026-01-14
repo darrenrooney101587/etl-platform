@@ -356,9 +356,6 @@ class SignalService:
             return False
         if group.assigned_to_user_id is None:
             return False
-        active_window = timedelta(minutes=getattr(settings, "ACTIVE_WINDOW_MINUTES", 120))
-        if group.last_seen_at < as_of - active_window:
-            return False
         if group.last_daily_reminder_date == as_of.date():
             return False
         threshold_hours = (

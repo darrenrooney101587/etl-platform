@@ -9,9 +9,9 @@ packages = [{ include = "observability" }]
 [tool.poetry.dependencies]
 python = "^3.10"
 etl-core = { path = "../etl_core", develop = false }
-django = "^4.2"
-psycopg2-binary = "^2.9"
-slack-sdk = "^3.39.0"
+django = "4.2.27"
+psycopg2-binary = "2.9.11"
+slack-sdk = "3.39.0"
 
 [tool.poetry.scripts]
 etl-observe = "observability.cli:main"
