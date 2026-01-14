@@ -20,6 +20,9 @@ class SeederConfig:
     max_failures: int
     reset_seconds: int
     refresh_concurrently: bool
+    batch_size: int
+    start_delay_ms: int
+    max_db_active_queries: int
 
     @classmethod
     def from_env(cls) -> "SeederConfig":
@@ -33,4 +36,7 @@ class SeederConfig:
             max_failures=int(os.getenv("SEEDER_MAX_FAILURES", "5")),
             reset_seconds=int(os.getenv("SEEDER_RESET_SECONDS", "300")),
             refresh_concurrently=os.getenv("SEEDER_REFRESH_CONCURRENTLY", "false").lower() == "true",
+            batch_size=int(os.getenv("SEEDER_BATCH_SIZE", "8")),
+            start_delay_ms=int(os.getenv("SEEDER_START_DELAY_MS", "0")),
+            max_db_active_queries=int(os.getenv("SEEDER_MAX_DB_ACTIVE_QUERIES", "0")),
         )

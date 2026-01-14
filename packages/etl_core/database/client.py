@@ -10,7 +10,7 @@ class DatabaseClient:
 
     Responsibilities:
     - Provide a minimal, DI-friendly API for executing SQL and returning dict rows.
-of     - Avoid embedding domain-specific SQL. Domain repositories should live in
+    - Avoid embedding domain-specific SQL. Domain repositories should live in
       package-level repositories (for example, `packages/data_pipeline/repositories`).
 
     Construction:
@@ -100,8 +100,8 @@ of     - Avoid embedding domain-specific SQL. Domain repositories should live in
         except Exception as exc:
             logger.warning(f"{context} -> failed to log DB settings: {exc}")
 
-    def execute_query(self, sql: str, params: Optional[List[Any]] = None, suppress_errors: bool = False) -> List[Dict[str, Any]]:
-        """Execute a read-only SQL query and return rows as dictionaries.
+    def execute_query(self, sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+        """Execute a SQL query and return rows as dictionaries.
 
         This is the only query surface etl_core exposes; domain SQL must live in
         package-level repositories (for example, `packages/data_pipeline/repositories`).
@@ -109,7 +109,6 @@ of     - Avoid embedding domain-specific SQL. Domain repositories should live in
         Args:
             sql: SQL statement to execute.
             params: Optional list/tuple of parameters.
-            suppress_errors: If True, don't log the exception at ERROR level prior to raising.
 
         Returns:
             List of rows as dicts.
@@ -129,11 +128,8 @@ of     - Avoid embedding domain-specific SQL. Domain repositories should live in
                     return [dict(r) for r in rows]
                 return []
         except Exception as exc:
-            # Allow callers to suppress noisy expected DB errors (e.g., concurrent
-            # refresh prerequisites). When suppress_errors=True we re-raise the
-            # exception without logging at ERROR level so callers can handle it.
-            if not suppress_errors:
-                logger.error("Database query failed: %s", exc)
+            # Always log DB errors; never suppress them
+            logger.error("Database query failed: %s", exc)
             raise
 
     # ------------------------------------------------------------------
@@ -142,9 +138,9 @@ of     - Avoid embedding domain-specific SQL. Domain repositories should live in
     # available (the test harness injects a MagicMock for this). Otherwise
     # they fall back to the generic execute_query surface.
     # ------------------------------------------------------------------
-    def _execute_via_connections(self, sql: str, params: Optional[List[Any]] = None, suppress_errors: bool = False) -> List[Dict[str, Any]]:
+    def _execute_via_connections(self, sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
         if not self._connections:
-            return self.execute_query(sql, params, suppress_errors=suppress_errors)
+            return self.execute_query(sql, params)
 
         with self._connections[self._db_alias].cursor() as cursor:
             try:
@@ -153,8 +149,7 @@ of     - Avoid embedding domain-specific SQL. Domain repositories should live in
                 else:
                     cursor.execute(sql, params)
             except Exception as exc:
-                if not suppress_errors:
-                    logger.error("Database query failed: %s", exc)
+                logger.error("Database query failed: %s", exc)
                 raise
             columns = [col[0] for col in cursor.description] if cursor.description else []
             results: List[Dict[str, Any]] = []
@@ -218,7 +213,7 @@ of     - Avoid embedding domain-specific SQL. Domain repositories should live in
                     FROM forms
                     UNION
                     SELECT *
-                    FROM users \
+                    FROM users
                     """
         return self._execute_via_connections(sql_query, [agency_id])
 
@@ -275,7 +270,7 @@ of     - Avoid embedding domain-specific SQL. Domain repositories should live in
                                   ON ueh.user_organizational_unit_history_id = uouh.id
                              JOIN public.benchmark_user bu
                                   ON bu.integration_id = uouh.user_id
-                    WHERE t.agency_id = %s \
+                    WHERE t.agency_id = %s
                     """
         return self._execute_via_connections(sql_query, [agency_id])
 

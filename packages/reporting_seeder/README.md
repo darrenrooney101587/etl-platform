@@ -14,15 +14,70 @@ Daily materialized view refresh for agency reporting queries (custom + canned). 
 - Processors: reusable business logic (concurrency, circuit breaking, transforms). Accept typed dataclasses and client dependencies via constructor injection.
 - Repositories: contain domain SQL and data-shaping logic; accept a `DatabaseClient` via constructor injection.
 
-## Environment
-- Uses shared Postgres (defaults): host `localhost`, port `5432`. Override with `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
-- Optional circuit-breaker tuning via `SEEDER_MAX_FAILURES` and `SEEDER_RESET_SECONDS`.
+## Recent behavior & important operator notes
+This package was updated to make materialized-view refreshes robust and operator-friendly for production usage. Key points:
+
+- The seeder now distinguishes between two refresh modes:
+  - Non-concurrent refresh (default and safe): `REFRESH MATERIALIZED VIEW <view>` — takes an exclusive lock on the materialized view while refreshing. Use during a low-traffic maintenance window.
+  - Concurrent refresh (Postgres `CONCURRENTLY`): `REFRESH MATERIALIZED VIEW CONCURRENTLY <view>` — avoids exclusive locking but requires the materialized view to have a unique index with no WHERE clause. The seeder will only attempt concurrent refresh when a unique index is present.
+
+- Auto-creation of unique indexes has been intentionally removed. Creating a correct unique index requires domain knowledge about the view's data; automatically guessing a unique key is unsafe. Operators should create appropriate unique indexes via migrations or manual SQL when concurrent refresh is required.
+
+- The processor collects PostgreSQL-side metrics (via `pg_stat_statements` / `pg_stat_activity`) where available, and records these in the seeder history tables so the team can observe DB-side cost (I/O, time) for each manifest.
+
+## Throttling, leveling, and safety levers
+To avoid flooding the database, the seeder exposes several environment-configurable levers. These are designed to be conservative by default and let you tune how aggressively the job submits/executes refreshes.
+
+Environment variables (defaults shown)
+
+- `DB_HOST` (default: `localhost`) — Postgres host
+- `DB_PORT` (default: `5432`) — Postgres port
+- `DB_NAME` (default: `postgres`) — Postgres database name
+- `DB_USER` / `DB_PASSWORD` — DB credentials
+
+- `SEEDER_MAX_WORKERS` (default: `8`) — number of worker threads in the thread pool (true concurrent refresh limit). Lower to reduce concurrent DB connections.
+- `SEEDER_BATCH_SIZE` (default: `8`) — number of manifests submitted per batch. Submission rate is controlled by batching; the executor still enforces `SEEDER_MAX_WORKERS` for concurrent execution.
+- `SEEDER_START_DELAY_MS` (default: `0`) — milliseconds to wait between submitting batches. Use to spread load over time.
+- `SEEDER_MAX_DB_ACTIVE_QUERIES` (default: `0` = disabled) — when > 0 the processor polls `pg_stat_activity` before submitting each batch and waits while the total active (non-idle) DB queries are >= this threshold. This is a conservative DB-aware throttle across the whole DB instance.
+- `SEEDER_MAX_FAILURES` (default: `5`) — how many consecutive failures before the internal circuit breaker opens and stops new work temporarily.
+- `SEEDER_RESET_SECONDS` (default: `300`) — cooldown seconds after the circuit breaker opens.
+- `SEEDER_REFRESH_CONCURRENTLY` (default: `false`) — allow attempts at concurrent refresh when a unique index exists (the code will still skip CONCURRENTLY if the view lacks a unique index).
+
+Recommended conservative example for shared production DBs
+
+- `SEEDER_MAX_WORKERS=4`
+- `SEEDER_BATCH_SIZE=2`
+- `SEEDER_START_DELAY_MS=500` (0.5s)
+- `SEEDER_MAX_DB_ACTIVE_QUERIES=20`
+- `SEEDER_REFRESH_CONCURRENTLY=false` (unless you have inspected and created unique indexes)
+
+These settings reduce concurrency and submit rate, and add a small spacing between batches to avoid sudden bursts.
+
+## Index policy and concurrent refresh guidance
+- The only safe way to enable `REFRESH MATERIALIZED VIEW CONCURRENTLY` is to create a unique index (no WHERE clause) on the materialized view. This must be done manually by DB owners/operators.
+- Example (run as DB owner; use `CONCURRENTLY` to avoid long exclusive locks when creating the index):
+
+```sql
+-- Replace reporting.my_view and col_name with the correct schema.table and column(s)
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_my_view_unique_col ON reporting.my_view (col_name);
+```
+
+- If a unique index is not present the seeder will use non-concurrent refresh. Because you plan to run the refresh in a morning maintenance window, non-concurrent refresh is acceptable and the system will behave predictably.
+
+## Observability / postgres-side metrics
+- The seeder attempts to collect metrics from `pg_stat_statements` (if installed) and `pg_stat_activity`. These provide:
+  - `calls`, `total_exec_time`, `mean_exec_time`, `rows`, and block I/O counters (when `pg_stat_statements` is available).
+  - Current active query information (from `pg_stat_activity`) used by the DB-aware throttle.
+- We recommend enabling `pg_stat_statements` on the RDS/PG server to improve visibility. If it is not available the seeder logs will still work but postgres-side metrics will be absent.
 
 ## Quickstart (local)
 ```bash
 cd packages/reporting_seeder
 poetry install --no-interaction --no-ansi
-poetry run reporting-seeder list
+# Run a conservative local test (adjust env as needed)
+SEEDER_MAX_WORKERS=4 SEEDER_BATCH_SIZE=2 SEEDER_START_DELAY_MS=500 SEEDER_MAX_DB_ACTIVE_QUERIES=20 \
+  SEEDER_REFRESH_CONCURRENTLY=false \
+  poetry run python -m cli.main run refresh_all
 ```
 
 ## Running jobs
@@ -31,10 +86,10 @@ poetry run reporting-seeder list
 poetry run reporting-seeder run refresh_all
 
 # Run a single agency by slug
-poetry run reporting-seeder run refresh_agency -- gotham
+poetry run reporting-seeder run refresh_agency gotham
 
 # Run a specific manifest record by table name
-poetry run reporting-seeder run refresh_table -- reporting.stg_arrests
+poetry run reporting-seeder run refresh_table reporting.stg_arrests
 ```
 
 ## Using the Django ORM (developer example)

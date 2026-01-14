@@ -40,17 +40,6 @@ def entrypoint(argv: List[str]) -> int:
         logger.exception("Failed to bootstrap Django using %s", settings_module)
         raise
 
-    # Reduce noise from per-query DB client logging during the refresh loop.
-    # The DB client logs detailed connection/activity at DEBUG; in some dev
-    # environments the handler level is INFO so those calls can be noisy. Raising
-    # the logger to WARNING keeps important errors while suppressing query chatter.
-    try:
-        import logging as _logging
-
-        _logging.getLogger("etl_core.database.client").setLevel(_logging.WARNING)
-    except Exception:
-        pass
-
     db_client = DatabaseClient()
     manifest_repo = ManifestRepository(db_client)
     history_repo = HistoryRepository()
@@ -69,9 +58,11 @@ def entrypoint(argv: List[str]) -> int:
         circuit_breaker=circuit_breaker,
         config=config,
     )
+
+    logger.info("Starting refresh_all with %d max workers", config.max_workers)
     processor.refresh_all()
-    # Visible marker for automated verification in CI/local runs (prints to stdout)
-    print("REFRESH_DONE")
+    logger.info("Refresh all completed")
+
     return 0
 
 
