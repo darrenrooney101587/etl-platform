@@ -25,6 +25,12 @@ def entrypoint(argv: List[str]) -> int:
     """Refresh all enabled manifest entries for a single agency."""
     parser = argparse.ArgumentParser(prog="refresh_agency")
     parser.add_argument("agency_slug", help="Agency slug to refresh")
+    parser.add_argument(
+        "--report-type",
+        choices=["all", "custom", "canned"],
+        default="all",
+        help="Filter to 'custom' or 'canned' manifests (default: all)",
+    )
     args = parser.parse_args(argv)
 
     config = SeederConfig.from_env()
@@ -55,7 +61,7 @@ def entrypoint(argv: List[str]) -> int:
         circuit_breaker=circuit_breaker,
         config=config,
     )
-    processor.refresh_agency(args.agency_slug)
+    processor.refresh_agency_for_type(args.agency_slug, args.report_type)
     return 0
 
 

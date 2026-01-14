@@ -44,13 +44,31 @@ class RefreshProcessor:
         self._config = config
 
     def refresh_all(self) -> None:
-        """Refresh all enabled manifests."""
-        manifests = self._manifests.get_enabled_manifests()
+        """Refresh all enabled manifests.
+
+        Optional filtering by report type is supported via the `report_type`
+        argument in the job entrypoint; that value is passed through to the
+        repository layer which returns only the requested manifests.
+        """
+        # Backwards-compatible single-arg API retained (no report_type -> all)
+        self.refresh_all_for_type(None)
+
+    def refresh_all_for_type(self, report_type: Optional[str]) -> None:
+        """Refresh enabled manifests optionally filtered by report_type.
+
+        report_type: one of None|'all'|'custom'|'canned'
+        """
+        manifests = self._manifests.get_enabled_manifests_for_type(report_type)
         self._refresh_many(manifests)
 
     def refresh_agency(self, agency_slug: str) -> None:
         """Refresh all enabled manifests for a specific agency."""
-        manifests = self._manifests.get_enabled_manifests_for_agency(agency_slug)
+        # Backwards-compatible API retained; delegate to filtered variant
+        self.refresh_agency_for_type(agency_slug, None)
+
+    def refresh_agency_for_type(self, agency_slug: str, report_type: Optional[str]) -> None:
+        """Refresh enabled manifests for an agency, optionally filtered by report_type."""
+        manifests = self._manifests.get_enabled_manifests_for_agency_and_type(agency_slug, report_type)
         self._refresh_many(manifests)
 
     def refresh_table(self, table_name: str) -> None:

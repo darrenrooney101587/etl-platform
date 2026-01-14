@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 from typing import List
@@ -29,6 +30,15 @@ def entrypoint(argv: List[str]) -> int:
     Returns:
         Process exit code.
     """
+    parser = argparse.ArgumentParser(prog="refresh_all")
+    parser.add_argument(
+        "--report-type",
+        choices=["all", "custom", "canned"],
+        default="all",
+        help="Filter to 'custom' or 'canned' manifests (default: all)",
+    )
+    args = parser.parse_args(argv)
+
     config = SeederConfig.from_env()
 
     # We require Django to be configured for HistoryRepository.
@@ -59,8 +69,8 @@ def entrypoint(argv: List[str]) -> int:
         config=config,
     )
 
-    logger.info("Starting refresh_all with %d max workers", config.max_workers)
-    processor.refresh_all()
+    logger.info("Starting refresh_all with %d max workers (report_type=%s)", config.max_workers, args.report_type)
+    processor.refresh_all_for_type(args.report_type)
     logger.info("Refresh all completed")
 
     return 0

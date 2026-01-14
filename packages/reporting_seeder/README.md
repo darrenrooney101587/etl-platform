@@ -53,17 +53,6 @@ Recommended conservative example for shared production DBs
 
 These settings reduce concurrency and submit rate, and add a small spacing between batches to avoid sudden bursts.
 
-## Index policy and concurrent refresh guidance
-- The only safe way to enable `REFRESH MATERIALIZED VIEW CONCURRENTLY` is to create a unique index (no WHERE clause) on the materialized view. This must be done manually by DB owners/operators.
-- Example (run as DB owner; use `CONCURRENTLY` to avoid long exclusive locks when creating the index):
-
-```sql
--- Replace reporting.my_view and col_name with the correct schema.table and column(s)
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_my_view_unique_col ON reporting.my_view (col_name);
-```
-
-- If a unique index is not present the seeder will use non-concurrent refresh. Because you plan to run the refresh in a morning maintenance window, non-concurrent refresh is acceptable and the system will behave predictably.
-
 ## Observability / postgres-side metrics
 - The seeder attempts to collect metrics from `pg_stat_statements` (if installed) and `pg_stat_activity`. These provide:
   - `calls`, `total_exec_time`, `mean_exec_time`, `rows`, and block I/O counters (when `pg_stat_statements` is available).
@@ -85,7 +74,14 @@ SEEDER_MAX_WORKERS=4 SEEDER_BATCH_SIZE=2 SEEDER_START_DELAY_MS=500 SEEDER_MAX_DB
 # Preferred (quick) — run from the package directory using the package module
 # This does not require installing the package as a script and is safe for local/dev runs
 cd packages/reporting_seeder
+# Run all manifests (default)
 poetry run python -m cli.main run refresh_all
+
+# Run only custom manifests
+poetry run python -m cli.main run refresh_all -- --report-type custom
+
+# Run only canned manifests
+poetry run python -m cli.main run refresh_all -- --report-type canned
 
 # Or, if you prefer to install the package entrypoint so `reporting-seeder` is available:
 # 1) install the package (creates the script entrypoint)
