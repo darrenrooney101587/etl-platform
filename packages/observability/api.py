@@ -7,7 +7,7 @@ import json
 import time
 import threading
 from datetime import datetime
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
@@ -221,7 +221,7 @@ def _verify_slack_signature(request: HttpRequest) -> bool:
     return hmac.compare_digest(computed, signature)
 
 
-def _parse_datetime(value: Any) -> datetime | None:
+def _parse_datetime(value: Any) -> Optional[datetime]:
     if value is None:
         return None
     if isinstance(value, datetime):

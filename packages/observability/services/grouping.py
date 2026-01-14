@@ -360,7 +360,7 @@ class SignalService:
             return False
         # Lower integers represent higher severity (S0/S1). Remind those faster.
         threshold_hours = (
-            getattr(settings, "REMINDER_T2_HOURS", 2) if group.current_severity <= 1 else getattr(settings, "REMINDER_T8_HOURS", 8)
+            getattr(settings, "REMINDER_T2_HOURS", 2) if group.current_severity <= HIGH_SEVERITY_MAX else getattr(settings, "REMINDER_T8_HOURS", 8)
         )
         if group.last_reminded_at and (as_of - group.last_reminded_at) < timedelta(hours=threshold_hours):
             return False
@@ -395,3 +395,4 @@ class SignalService:
             return None
         mapping = UserSlackMap.objects.filter(user_id=actor_user_id).first()
         return mapping.slack_user_id if mapping else None
+HIGH_SEVERITY_MAX = 1
