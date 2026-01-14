@@ -92,6 +92,9 @@ a
    - **Docker builds must never install from the repo root**.
    - Dockerfiles must install from each module directory (module `pyproject.toml` + `poetry.lock`).
 
+## Standalone modules using ORM models
+- If a module imports `etl-database-schema` models, it acts as a Django project runner. The agent must ensure a minimal `settings.py` exists in the package (configuring INSTALLED_APPS/DATABASES) and is used to bootstrap Django in the entrypoints.
+
 ## Module inventory
 - `packages/etl_core`: shared utilities (config/logging/metrics/S3/retry/types). No Django.
 - `packages/file_processing`: decrypt/unzip/materialize + whole-file quality analysis.

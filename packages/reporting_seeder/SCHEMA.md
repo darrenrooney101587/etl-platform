@@ -4,11 +4,11 @@ DDL lives in `etl-database-schema`. This file captures the required tables/mater
 
 ## Existing inputs (manifests)
 - `reporting.seeder_custom_report_manifest`
-  - `id`, `table_name`, `report_name`, `agency_id`, `agency_slug`, `query`, `database_id`, `enabled`, `module`
+  - `id`, `table_name`, `report_name`, `agency_id`, `agency_slug`, `query`, `database_id`, `enabled`
 - `reporting.seeder_canned_report_manifest`
   - `id`, `agency_id`, `agency_slug`, `canned_report_id`
 - `reporting.seeder_canned_report`
-  - `id`, `table_name`, `report_name`, `query`, `database_id`, `module`
+  - `id`, `table_name`, `report_name`, `query`, `database_id`
 
 ## New/updated objects
 

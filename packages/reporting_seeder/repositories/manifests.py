@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from packages.etl_core.database.client import DatabaseClient
+from etl_core.database.client import DatabaseClient
 
 
 class ManifestRepository:

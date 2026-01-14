@@ -2,7 +2,7 @@ import os
 import time
 import unittest
 import uuid
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 # Attempt to load a local .env file (packages/reporting_seeder/.env) for integration tests.
 # This keeps tests runnable locally without requiring manual env export when developers
@@ -20,7 +20,7 @@ except Exception:
 
 from etl_core.support.circuit_breaker import CircuitBreaker
 from etl_core.support.executor import ParallelExecutor
-from packages.etl_core.database.client import DatabaseClient
+from etl_core.database.client import DatabaseClient
 from reporting_seeder.repositories.manifests import ManifestRepository
 from reporting_seeder.repositories.materialized_views import MaterializedViewRepository
 from reporting_seeder.repositories.history import HistoryRepository
@@ -72,8 +72,8 @@ class SeederLoadIntegrationTest(unittest.TestCase):
             # Insert manifest row; explicitly specify columns to match schema
             sql = (
                 "INSERT INTO reporting.seeder_custom_report_manifest "
-                "(table_name, report_name, agency_id, agency_slug, query, database_id, enabled, module) "
-                "VALUES (%s, %s, %s, %s, %s, %s, TRUE, 1) RETURNING id"
+                "(table_name, report_name, agency_id, agency_slug, query, database_id, enabled) "
+                "VALUES (%s, %s, %s, %s, %s, %s, TRUE) RETURNING id"
             )
             rows = self.db.execute_query(sql, [table_name, f"load_test_{i}", 1, "test", query, 1])
             # DatabaseClient returns rows for SELECT/RETURNING; pick inserted id if present else track 0

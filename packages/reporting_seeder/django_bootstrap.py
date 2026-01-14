@@ -27,6 +27,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def bootstrap_django(settings_module: str) -> None:
@@ -50,11 +53,18 @@ def bootstrap_django(settings_module: str) -> None:
     # Deferred import
     try:
         from django import setup as django_setup  # type: ignore
+        from django.conf import settings
+        from django.apps import apps
     except Exception as exc:  # pragma: no cover - runtime dependency
         raise RuntimeError("Django must be installed to bootstrap the ORM") from exc
 
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", settings_module)
-    django_setup()
+    if apps.ready:
+        return
+
+    if not settings.configured:
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", settings_module)
+        logger.info("Bootstrapping Django with settings: %s", settings_module)
+        django_setup()
 
 
 class DjangoORMClient:

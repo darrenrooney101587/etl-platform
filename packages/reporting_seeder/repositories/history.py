@@ -1,7 +1,7 @@
 """Repository for recording refresh history and metrics using Django ORM.
 
 This implementation uses the upstream models from
-`etl_database_schema.apps.reporting.models` and performs ORM operations.
+`etl_database_schema.apps.bms_reporting.models` and performs ORM operations.
 Django must be configured (set DJANGO_SETTINGS_MODULE and call django.setup())
 before instantiating or using this repository.
 """
@@ -40,16 +40,17 @@ class HistoryRepository:
             message explains how to bootstrap Django for callers.
         """
         try:
-            from etl_database_schema.apps.reporting.models import (
+            from etl_database_schema.apps.bms_reporting.models import (
                 SeederRunHistory,
                 SeederJobStatus,
             )
             return SeederRunHistory, SeederJobStatus
         except Exception as exc:  # pragma: no cover - runtime dependency
+            # Provide a clear error directing callers to bootstrap Django.
             raise RuntimeError(
-                "Django ORM models are not available. Ensure DJANGO_SETTINGS_MODULE "
-                "is set and django.setup() has been called (for example via "
-                "reporting_seeder.django_bootstrap.bootstrap_django).") from exc
+                "Django ORM models are not available. Ensure DJANGO_SETTINGS_MODULE is set "
+                "and that reporting_seeder.django_bootstrap.bootstrap_django(...) has been called before using HistoryRepository."
+            ) from exc
 
     def record_start(self, run_id: str, manifest: Dict[str, object]) -> None:
         SeederRunHistory, SeederJobStatus = self._ensure_models()

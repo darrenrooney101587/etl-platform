@@ -10,8 +10,8 @@ class DatabaseClient:
 
     Responsibilities:
     - Provide a minimal, DI-friendly API for executing SQL and returning dict rows.
-    - Avoid embedding domain-specific SQL. Domain repositories should live in package modules
-      (for example `packages/data_pipeline/repositories`).
+of     - Avoid embedding domain-specific SQL. Domain repositories should live in
+      package-level repositories (for example, `packages/data_pipeline/repositories`).
 
     Construction:
       - Pass an existing DB connection via `connection` for tests, or
@@ -24,6 +24,8 @@ class DatabaseClient:
         self._dsn = dsn
         self._connections = connections
         self._db_alias = db_alias
+        # Only log DB connection metadata once per client to avoid noisy output
+        self._logged_connection_info: bool = False
 
     def _ensure_connection(self) -> Any:
         """Lazily create and return a psycopg2 connection.
@@ -80,20 +82,25 @@ class DatabaseClient:
 
     def _log_db_connections(self, context: str) -> None:
         """Log configured DB settings for debugging without exposing secrets."""
+        # Avoid logging the DB details on every query; do it once per client.
+        if self._logged_connection_info:
+            return
         try:
             dsn = self._dsn or os.getenv("DATABASE_URL")
             if dsn:
-                logger.info(f"{context} -> using DSN connection (redacted)")
+                logger.debug(f"{context} -> using DSN connection (redacted)")
+                self._logged_connection_info = True
                 return
             host = os.getenv("DB_HOST", "localhost")
             port = os.getenv("DB_PORT", "5432")
             dbname = os.getenv("DB_NAME", "<unset>")
             user = os.getenv("DB_USER", "<unset>")
-            logger.info(f"{context} -> host={host} port={port} db={dbname} user={user}")
+            logger.debug(f"{context} -> host={host} port={port} db={dbname} user={user}")
+            self._logged_connection_info = True
         except Exception as exc:
             logger.warning(f"{context} -> failed to log DB settings: {exc}")
 
-    def execute_query(self, sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+    def execute_query(self, sql: str, params: Optional[List[Any]] = None, suppress_errors: bool = False) -> List[Dict[str, Any]]:
         """Execute a read-only SQL query and return rows as dictionaries.
 
         This is the only query surface etl_core exposes; domain SQL must live in
@@ -102,6 +109,7 @@ class DatabaseClient:
         Args:
             sql: SQL statement to execute.
             params: Optional list/tuple of parameters.
+            suppress_errors: If True, don't log the exception at ERROR level prior to raising.
 
         Returns:
             List of rows as dicts.
@@ -111,14 +119,21 @@ class DatabaseClient:
             conn = self._ensure_connection()
             import psycopg2.extras as _extras  # type: ignore
             with conn.cursor(cursor_factory=_extras.RealDictCursor) as cursor:
-                cursor.execute(sql, params or [])
+                if params is None:
+                    cursor.execute(sql)
+                else:
+                    cursor.execute(sql, params)
                 # Only fetch results if the query returns rows (SELECT, RETURNING)
                 if cursor.description:
                     rows = cursor.fetchall()
                     return [dict(r) for r in rows]
                 return []
         except Exception as exc:
-            logger.error("Database query failed: %s", exc)
+            # Allow callers to suppress noisy expected DB errors (e.g., concurrent
+            # refresh prerequisites). When suppress_errors=True we re-raise the
+            # exception without logging at ERROR level so callers can handle it.
+            if not suppress_errors:
+                logger.error("Database query failed: %s", exc)
             raise
 
     # ------------------------------------------------------------------
@@ -127,12 +142,20 @@ class DatabaseClient:
     # available (the test harness injects a MagicMock for this). Otherwise
     # they fall back to the generic execute_query surface.
     # ------------------------------------------------------------------
-    def _execute_via_connections(self, sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+    def _execute_via_connections(self, sql: str, params: Optional[List[Any]] = None, suppress_errors: bool = False) -> List[Dict[str, Any]]:
         if not self._connections:
-            return self.execute_query(sql, params)
+            return self.execute_query(sql, params, suppress_errors=suppress_errors)
 
         with self._connections[self._db_alias].cursor() as cursor:
-            cursor.execute(sql, params or [])
+            try:
+                if params is None:
+                    cursor.execute(sql)
+                else:
+                    cursor.execute(sql, params)
+            except Exception as exc:
+                if not suppress_errors:
+                    logger.error("Database query failed: %s", exc)
+                raise
             columns = [col[0] for col in cursor.description] if cursor.description else []
             results: List[Dict[str, Any]] = []
             for row in cursor.fetchall():

@@ -62,6 +62,15 @@ All classes that talk to external resources (AWS, HTTP clients, DB connectors, r
 - Repositories should accept a `DatabaseClient` via constructor injection and expose named methods (e.g. `get_attachment_files_for_s3_processing`) that return typed results.
 - If a query becomes broadly useful across modules or should be kept as canonical domain logic, promote it to `etl-database-schema` or another shared schema package.
 
+## 2.6 Consuming etl-database-schema (Standalone ORM Usage)
+
+- Modules that import `etl-database-schema` (Django models) for standalone jobs must act as the runtime project configuration.
+- **Requirement:** The module must contain a minimal `settings.py` (e.g., `packages/<module>/settings.py`) that defines:
+  - `INSTALLED_APPS`: Must include `etl_database_schema` apps needed by the module.
+  - `DATABASES`: configured from environment variables (consistent with `DatabaseClient` variables).
+  - `SECRET_KEY`: Can be a dummy value for non-web jobs.
+- **Bootstrapping:** Job entrypoints must strictly check for `DJANGO_SETTINGS_MODULE` and call `django.setup()` (via a bootstrap helper) before any thread pool creation or model access.
+
 ## 2.4 Testing
 
 - Use **unittest.TestCase** for all tests.

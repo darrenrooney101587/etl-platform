@@ -24,11 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
 from urllib.request import urlopen
-import threading
 import time
-from typing import Optional as TypingOptional
-
-# Import the correct entrypoint within the file_processing package
 from file_processing.jobs.s3_data_quality_job import entrypoint
 from packages.etl_core.support.circuit_breaker import CircuitBreaker
 

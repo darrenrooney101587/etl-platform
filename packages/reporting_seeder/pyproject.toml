@@ -1,10 +1,16 @@
 [tool.poetry]
+package-mode = false
 name = "reporting-seeder"
 version = "0.1.0"
 description = "Daily materialized view refresh for agency reporting queries"
 authors = ["Admin <admin@example.com>"]
 readme = "README.md"
-packages = [{ include = "reporting_seeder" }]
+
+# NOTE:
+# This module follows the monorepo's "package-root" layout convention: Python
+# sources live directly under `packages/reporting_seeder/` (e.g. `jobs/`, `cli/`).
+# We do not declare a `packages = [...]` include because there is no nested
+# `reporting_seeder/` package directory to include.
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -14,7 +20,7 @@ psutil = ">=5.9,<8.0"
 etl-database-schema = { git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git", branch = "main" }
 
 [tool.poetry.scripts]
-reporting-seeder = "reporting_seeder.cli.main:main"
+reporting-seeder = "cli.main:main"
 
 [build-system]
 requires = ["poetry-core"]
