@@ -82,14 +82,35 @@ SEEDER_MAX_WORKERS=4 SEEDER_BATCH_SIZE=2 SEEDER_START_DELAY_MS=500 SEEDER_MAX_DB
 
 ## Running jobs
 ```bash
-# Run all enabled agencies (parallelized)
+# Preferred (quick) — run from the package directory using the package module
+# This does not require installing the package as a script and is safe for local/dev runs
+cd packages/reporting_seeder
+poetry run python -m cli.main run refresh_all
+
+# Or, if you prefer to install the package entrypoint so `reporting-seeder` is available:
+# 1) install the package (creates the script entrypoint)
+cd packages/reporting_seeder
+poetry install --no-interaction --no-ansi
+# 2) run the installed entrypoint
 poetry run reporting-seeder run refresh_all
+```
 
-# Run a single agency by slug
-poetry run reporting-seeder run refresh_agency gotham
+Note: you saw a warning like "Warning: 'reporting-seeder' is an entry point defined in pyproject.toml, but it's not installed as a script" because you tried to run the entrypoint without installing the package. Use the first (module) option for quick runs, or run `poetry install` in the package directory once to enable the `reporting-seeder` command.
 
-# Run a specific manifest record by table name
-poetry run reporting-seeder run refresh_table reporting.stg_arrests
+```bash
+# Run a single agency by slug (recommended module run)
+cd packages/reporting_seeder
+poetry run python -m cli.main run refresh_agency demo
+
+# Or, if you have installed the package entrypoint via `poetry install`:
+poetry run reporting-seeder run refresh_agency demo
+
+# Run a specific manifest record by table name (recommended module run)
+cd packages/reporting_seeder
+poetry run python -m cli.main run refresh_table reporting.reports
+
+# Or, if installed:
+poetry run reporting-seeder run refresh_table reporting.reports
 ```
 
 ## Using the Django ORM (developer example)
