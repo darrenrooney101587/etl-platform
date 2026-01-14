@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import time
+import threading
 from datetime import datetime
 from typing import Any, Dict, Tuple
 
@@ -19,6 +20,7 @@ from observability.services.slack_connector import SlackConnector
 
 signal_service = SignalService(notifier=SlackConnector())
 IDEMPOTENCY_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+IDEMPOTENCY_LOCK = threading.Lock()
 IDEMPOTENCY_TTL_SECONDS = 600
 
 
@@ -63,7 +65,8 @@ def ingest_signal(request: HttpRequest) -> HttpResponse:
     body = json.loads(raw_body)
     idempotency_key = request.headers.get("Idempotency-Key")
     if idempotency_key:
-        cached = IDEMPOTENCY_CACHE.get(idempotency_key)
+        with IDEMPOTENCY_LOCK:
+            cached = IDEMPOTENCY_CACHE.get(idempotency_key)
         now_ts = time.time()
         if cached and now_ts - cached[0] < IDEMPOTENCY_TTL_SECONDS:
             return JsonResponse(cached[1], status=200)
@@ -92,7 +95,8 @@ def ingest_signal(request: HttpRequest) -> HttpResponse:
         "fingerprint": signal.fingerprint,
     }
     if idempotency_key:
-        IDEMPOTENCY_CACHE[idempotency_key] = (time.time(), response_payload)
+        with IDEMPOTENCY_LOCK:
+            IDEMPOTENCY_CACHE[idempotency_key] = (time.time(), response_payload)
     return JsonResponse(response_payload, status=201)
 
 

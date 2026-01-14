@@ -358,6 +358,7 @@ class SignalService:
             return False
         if group.last_daily_reminder_date == as_of.date():
             return False
+        # Lower integers represent higher severity (S0/S1). Remind those faster.
         threshold_hours = (
             getattr(settings, "REMINDER_T2_HOURS", 2) if group.current_severity <= 1 else getattr(settings, "REMINDER_T8_HOURS", 8)
         )

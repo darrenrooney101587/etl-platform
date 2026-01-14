@@ -26,12 +26,10 @@ def run_worker(interval_minutes: int) -> None:
     bootstrap()
     service = SignalService(notifier=SlackConnector())
     digest_target = _parse_digest_time(getattr(settings, "DAILY_DIGEST_TIME", "09:00"))
-    last_digest_date: Optional[date] = None
     while True:
         now = timezone.now()
-        if last_digest_date != now.date() and now.time() >= digest_target:
+        if now.time() >= digest_target:
             service.send_daily_digest(now.date())
-            last_digest_date = now.date()
         service.send_reminders(now)
         time.sleep(interval_minutes * 60)
 

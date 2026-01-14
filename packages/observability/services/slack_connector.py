@@ -79,6 +79,7 @@ class SlackConnector(SlackNotifier):
             channel_resp = self.client.conversations_open(users=slack_user_id)
             channel_id = channel_resp.get("channel", {}).get("id")
             if not channel_id:
+                logger.warning("Slack DM channel not returned for user %s: %s", slack_user_id, channel_resp)
                 return
             self.client.chat_postMessage(
                 channel=channel_id,
@@ -86,7 +87,7 @@ class SlackConnector(SlackNotifier):
                 blocks=self._build_blocks(group, include_ack_button=False),
             )
         except SlackApiError:
-            logger.warning("Failed to send reminder for group %s", group.id, exc_info=True)
+            logger.warning("Failed to send reminder for group %s to user %s", group.id, slack_user_id, exc_info=True)
 
     def post_digest(self, groups: List[SignalGroup], digest_date: date) -> None:
         if not self.client or not self.shared_channel_id:
