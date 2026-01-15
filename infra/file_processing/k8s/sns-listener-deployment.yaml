@@ -8,16 +8,16 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sns-listener
+  name: file-processing-sns
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sns-listener
+      app: file-processing-sns
   template:
     metadata:
       labels:
-        app: sns-listener
+        app: file-processing-sns
     spec:
       serviceAccountName: file-processing
       containers:

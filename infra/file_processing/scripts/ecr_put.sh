@@ -9,8 +9,17 @@ ECR_REPO_NAME="file-processing"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
 # Terraform dir for this stack
 TF_DIR="${REPO_ROOT}/infra/file_processing/terraform"
+# Default Dockerfile path (repo-level docker/) - fallback below if missing
 DOCKERFILE_PATH="${REPO_ROOT}/docker/file-processing.Dockerfile"
 BUILD_CONTEXT="${REPO_ROOT}"
+
+# If repo-level Dockerfile is missing, fall back to package-level Dockerfile
+if [[ ! -f "${DOCKERFILE_PATH}" ]]; then
+  FALLBACK_DOCKERFILE="${REPO_ROOT}/packages/file_processing/file-processing.Dockerfile"
+  if [[ -f "${FALLBACK_DOCKERFILE}" ]]; then
+    DOCKERFILE_PATH="$FALLBACK_DOCKERFILE"
+  fi
+fi
 
 echo "Using AWS Profile: ${AWS_PROFILE}"
 echo "Using AWS Region:  ${AWS_REGION}"

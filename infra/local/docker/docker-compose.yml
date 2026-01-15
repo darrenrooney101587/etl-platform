@@ -12,6 +12,44 @@ services:
       - ./localstack_data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
 
+  localstack-init:
+    image: amazon/aws-cli
+    depends_on:
+      - localstack
+    entrypoint: ["sh","-c"]
+    command: >
+      set -euo pipefail
+      EDGE_URL=http://localstack:4566
+      PERSPECTIVE=${PERSPECTIVE:-file_processing}
+      LISTENER_HOST=${LISTENER_HOST:-host.docker.internal}
+      LISTENER_PORT=${LISTENER_PORT:-8080}
+      for i in 1 2 3 4 5; do
+        if aws --endpoint-url="$EDGE_URL" sns list-topics >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+      P_SAFE=$(echo "$PERSPECTIVE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-//; s/-$//')
+      BUCKET="etl-${P_SAFE}-client-etl"
+      TOPIC_NAME="${P_SAFE}-topic"
+      echo "Creating s3 bucket: $BUCKET"
+      aws --endpoint-url="$EDGE_URL" s3 mb "s3://$BUCKET" || true
+      echo "Creating SNS topic: $TOPIC_NAME"
+      TOPIC_ARN=$(aws --endpoint-url="$EDGE_URL" sns create-topic --name "$TOPIC_NAME" --output text --query 'TopicArn' 2>/dev/null || true)
+      echo "Topic ARN: $TOPIC_ARN"
+      if [ -n "$TOPIC_ARN" ]; then
+        SUB_ENDPOINT="http://${LISTENER_HOST}:${LISTENER_PORT}/"
+        echo "Subscribing $SUB_ENDPOINT to $TOPIC_ARN"
+        aws --endpoint-url="$EDGE_URL" sns subscribe --topic-arn "$TOPIC_ARN" --protocol http --notification-endpoint "$SUB_ENDPOINT" || true
+      fi
+      echo "Localstack init complete for perspective: $PERSPECTIVE"
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - PERSPECTIVE=file_processing
+      - LISTENER_HOST=host.docker.internal
+      - LISTENER_PORT=8080
+    restart: "no"
+
 # Notes:
 # - LocalStack exposes an "edge" API on port 4566 for all services.
 # - Use AWS CLI with --endpoint-url http://localhost:4566 when talking to LocalStack.
