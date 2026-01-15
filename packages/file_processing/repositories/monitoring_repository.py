@@ -32,7 +32,7 @@ def _import_monitoring_models() -> Optional[tuple]:
     or None if import fails.
     """
     try:
-        from etl_database_schema.apps.reporting.models import (
+        from etl_database_schema.apps.bms_reporting.models import (
             MonitoringFile as ORMMonitoringFile,
             MonitoringFileRun as ORMMonitoringFileRun,
             MonitoringFileDataQuality as ORMMonitoringFileDataQuality,

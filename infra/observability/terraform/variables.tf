@@ -59,3 +59,15 @@ variable "job_env" {
   description = "Environment variables injected into jobs"
   default     = {}
 }
+
+variable "aws_region" {
+  description = "AWS region to create resources in"
+  type        = string
+  default     = "us-gov-west-1"
+}
+
+variable "aws_profile" {
+  description = "AWS CLI profile name to use for provider authentication"
+  type        = string
+  default     = "etl-playground"
+}

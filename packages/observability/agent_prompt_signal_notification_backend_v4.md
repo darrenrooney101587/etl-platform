@@ -5,16 +5,16 @@ You are a senior backend engineer responsible for implementing a **Signal-based 
 
 You must implement:
 - Database models and migrations
-- Signal ingestion and query APIs
+- Job-based ingestion + query surfaces (preferred)
 - Deterministic fingerprinting + Signal Grouping
-- Ownership routing (tenant/job â†’ owner/team)
+- Ownership routing (tenant/job → owner/team)
 - Slack connector **with interactivity** (Acknowledge button)
 - Reminder + digest schedulers
-- Dockerized runtime (web + worker)
+- Dockerized runtime (worker + optional web surface)
 - Terraform for **notification-system-specific resources only** (no VPC/NAT/network primitives)
 
 Constraints:
-- Do **not** use the term â€œincident.â€ Use **Signal** and **Signal Group**.
+- Do **not** use the term “incident.” Use **Signal** and **Signal Group**.
 - Slack is not the system of record. The database is.
 - Slack shared channel must remain low-volume; repeated occurrences must not spam it.
 
@@ -25,24 +25,27 @@ Deliver production-ready code with tests and clear configuration.
 ## 0) Architecture (Target State)
 
 ### Components
-1. **Signal API service** (Django app)
-    - Receives signals (from Airflow / ETL systems)
-    - Persists Signals + Signal Groups
-    - Provides API for Notifications UI
-    - Hosts Slack interactions endpoint
+1. **Jobs / Ingestors (preferred)**
+    - Periodic or event-driven jobs that read existing internal tables (for example `pipeline_errors`, monitoring tables, or ETL job state tables) and produce `Signal` records in the notification DB.
+    - Jobs live under `packages/observability/jobs/` and export the `JOB` contract (entrypoint, description).
+    - Jobs call processors and repositories to compute fingerprints, upsert SignalGroups, and enqueue Slack tasks.
 
 2. **Worker / Scheduler**
     - Sends reminders (owner DM) and digests (shared channel)
     - Handles Slack message updates and retries
     - Runs periodically (Celery beat or cron-like scheduler)
 
-3. **Slack**
-    - Shared channel: only open/escalate/digest
-    - Owner DMs: reminders/digests
-    - Slack interactivity: Acknowledge button click â†’ backend state update â†’ Slack message updated
+3. **Slack Connector (required)**
+    - Responsible for posting/updating messages and sending DMs.
+    - Must be implemented as a connector/service in `packages/observability/services/` or `connectors/` and be callable from jobs/workers.
+    - Slack interactive callbacks (Ack button) are optional in this package — preferred default: have your existing Django webserver handle Slack interaction callbacks and map them to DB updates. If you must receive Slack callbacks here, expose a minimal, secure endpoint and keep it thin.
 
-### Event Flow
-Producer â†’ `POST /api/signals` â†’ store Signal â†’ upsert Signal Group â†’ decide notifications â†’ enqueue Slack send/update â†’ Slack message links to Notifications page.
+> Note: An HTTP ingestion API (POST /api/signals) is optional. Use it only if other systems outside the monorepo cannot write to the source tables or cannot run jobs. The default recommended model is jobs-only ingestion that reads internal tables like `pipeline_errors`.
+
+### Event Flow (jobs-first default)
+Producer (writes to source tables) → periodic job reads `pipeline_errors` (or other sources) → create `Signal` rows → upsert `SignalGroup` → decide notifications → enqueue Slack send/update → Slack message links to Notifications UI (served by the existing Django webserver).
+
+If external producers exist, an optional ingestion HTTP endpoint may be provided (see APIs section) but it is not required for the normal operation of the notification system.
 
 ---
 
@@ -253,43 +256,20 @@ Acknowledgement must not post new shared-channel messages.
 
 Tenant channels are not updated on acknowledgement by default.
 
-## 3) APIs (Must Implement)
+## 3) APIs (Optional — jobs-first)
 
-### 3.1 Signal Ingestion
-`POST /api/signals`
-Auth: internal service token or mTLS (use whatever exists; include enforcement)
-Body includes:
-- tenant_id, tenant_code, job_name, run_id?, task_id?, stage?, source, signal_type, severity, summary, details_json
-  Response:
-- `signal_id`
-- `signal_group_id`
-- `signal_group_status`
-- `fingerprint`
+APIs are optional for the notification system when using jobs-only ingestion. The existing Django webserver will remain the operational UI surface for end users (ack, snooze, assign, etc.). Implement APIs here only if one of the following is true:
+- External systems (outside your control) must push signals into the notification system, or
+- You decide to accept Slack interaction callbacks in this package instead of via the Django webserver.
 
-Idempotency (recommended):
-- Support optional `idempotency_key` header
-- Store last processed key for a short TTL to prevent duplicates on retries
+If you decide to provide an HTTP surface in `packages/observability/`, prefer a very small FastAPI app or a minimal Django bootstrap (per repo rules). Keep the handlers thin and delegate to processors/repositories.
 
-### 3.2 UI Support (Notifications Page)
-- `GET /api/signal-groups`
-    - filters: status, assigned_to=me, tenant_id, job_name, severity, updated_since, search
-- `GET /api/signal-groups/<id>`
-    - include recent signals (last N), group metadata, activity log
-- Actions:
-    - `POST /api/signal-groups/<id>/ack`
-    - `POST /api/signal-groups/<id>/snooze`
-    - `POST /api/signal-groups/<id>/assign`
-    - `POST /api/signal-groups/<id>/close`
+Optional endpoints (implement only if required):
+- `POST /api/signals` — ingestion (auth: internal token/mTLS). Use only when external producers cannot write to source tables or run jobs.
+- `POST /api/slack/interactions` — Slack interactive callbacks (verify signature). Preferred default: let the Django webserver receive Slack callbacks and update the DB; this package should then process queued Slack updates.
+- `GET /api/signal-groups` / `GET /api/signal-groups/<id>` — only implement if you need this package to directly support a separate UI; otherwise reuse the existing Django UI which reads the same DB.
 
-### 3.3 Slack Interactions
-`POST /api/slack/interactions`
-- Verify Slack signature headers
-- Parse payload
-- Extract `signal_group_id` from action value
-- Map Slack user id â†’ internal user id
-- Apply acknowledgement
-- Update Slack message via `chat.update`
-- Return 200 quickly (Slack timeouts); queue async update if needed
+Key rule: Do not duplicate the Django UI endpoints in this package unless there's a clear operational reason. Keep this package focused on jobs, processors, repositories, and connectors.
 
 ---
 
@@ -303,7 +283,7 @@ On group open:
     - summary (short)
     - count_total + last_seen_at
     - **Acknowledge button**
-    - â€œOpen in Notificationsâ€ link/button (deep link includes signal_group_id)
+    - â€œOpen in Notifications link/button (deep link includes signal_group_id)
 
 Persist returned:
 - `slack_channel_id`
@@ -348,24 +328,25 @@ Implementation options:
 
 ---
 
-## 6) Docker Requirements (Must Provide)
+## 6) Docker Requirements (Use Existing / Worker-first)
 
-Provide:
-- `Dockerfile` for the API service (python 3.10)
-- `docker-compose.yml` for local dev containing:
-    - api service
-    - worker service (celery worker/beat or scheduler)
-    - postgres (or use existing)
+- Use the existing `packages/observability/observability.Dockerfile` as the base image.
+- The notification system may be deployed as either:
+  - a worker-only image (preferred when jobs + workers handle all work), or
+  - an image that includes a small HTTP surface for optional endpoints (only if you implement them).
+- Provide `docker-compose.yml` in `packages/observability/` for local dev containing:
+    - worker service (Celery worker/beat or scheduler)
+    - optional api service (only if you expose endpoints)
+    - postgres (or reuse existing)
     - redis (if using celery)
 - Environment variables with sane defaults for local development
 
-Required env vars:
+Required env vars (only the ones relevant to jobs/workers + slack):
 - `DATABASE_URL`
 - `SLACK_BOT_TOKEN`
-- `SLACK_SIGNING_SECRET`
+- `SLACK_SIGNING_SECRET` (if you host Slack callbacks here)
 - `SLACK_SHARED_CHANNEL_ID`
 - `APP_BASE_URL` (for deep links)
-- `INTERNAL_INGEST_TOKEN`
 - reminder/digest tuning vars:
     - `REOPEN_WINDOW_HOURS` (default 24)
     - `ACTIVE_WINDOW_MINUTES` (default 120)
@@ -440,10 +421,12 @@ Deliverable: a `terraform/` module that can be applied independently with variab
 
 ## Output Expectations
 Deliver:
-- Django app code in `packages/observability/` (models, migrations, services, views) -> e.g., `packages/observability/models/`
-- Slack connector module in `packages/observability/services/` or `connectors/`
-- Worker/scheduler implementation in `packages/observability/jobs/` or `cli/`
-- Dockerfile updates + docker-compose.yml
+- Job modules in `packages/observability/jobs/` that ingest from internal tables (e.g., `pipeline_errors`) and export `JOB` tuples
+- Processors in `packages/observability/processors/` that compute fingerprints and apply grouping logic
+- Repositories in `packages/observability/repositories/` that accept a `DatabaseClient` via DI and contain domain SQL
+- Slack connector module in `packages/observability/services/` or `connectors/` (posting, updating, DM reminders)
+- Worker/scheduler implementation in `packages/observability/jobs/` or `cli/` (Celery or scheduled jobs)
+- Dockerfile updates + `packages/observability/docker-compose.yml` (worker-first)
 - Terraform module in `infra/observability/`
-- Tests in `packages/observability/tests/`
+- Tests in `packages/observability/tests/` (unit + integration with mocked Slack)
 - A short README explaining configuration and local run steps

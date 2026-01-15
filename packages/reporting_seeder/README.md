@@ -133,6 +133,75 @@ export DJANGO_DB_CLIENT_PATH=reporting_seeder.django_bootstrap:DjangoORMClient
 
 Code that uses `etl_core.support.db_factory.get_database_client()` will instantiate the configured client lazily. Importing `reporting_seeder.django_bootstrap` does not itself import Django; heavy imports are deferred until `bootstrap_django` or `DjangoORMClient` is used.
 
+## Local Docker development (recommended)
+
+`reporting_seeder` requires:
+- `etl_core` (local monorepo package)
+- `etl_database_schema` (private schema package)
+
+To avoid pulling `etl-database-schema` from GitLab during every Docker build (VPN dependency), the local workflow uses a sibling checkout staged into the Docker build context.
+
+1) One-time: clone the schema repo next to this repo:
+```bash
+git clone git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git ../etl-database-schema
+```
+
+2) Build the local image (stages schema into `.local/etl-database-schema` and builds from repo root):
+```bash
+./packages/reporting_seeder/scripts/build.sh
+```
+
+3) Run the container locally:
+
+ Show CLI help:
+ ```bash
+ docker run --rm etl-reporting-seeder --help
+ ```
+ 
+ Run a job (examples):
+ ```bash
+ # List jobs
+ docker run --rm etl-reporting-seeder list
+ 
+ # Run refresh_all using the per-package .env (recommended)
+ docker run --rm \
+   etl-reporting-seeder run refresh_all
+ ```
+
+Optional: override a variable without editing `.env` (common on macOS when connecting to host Postgres):
+```bash
+docker run --rm \
+  --env-file packages/reporting_seeder/.env \
+  -e DB_HOST=host.docker.internal \
+  etl-reporting-seeder run refresh_all
+```
+
+By default, this expects the schema repo to be checked out next to the repo root at `../etl-database-schema`.
+If your clone lives elsewhere, pass an explicit path:
+```bash
+./packages/reporting_seeder/scripts/build.sh --schema-path /absolute/path/to/etl-database-schema
+```
+
+### Updating code and schema (local dev)
+
+You do not need to re-clone `etl-database-schema` each time.
+
+- If `etl-platform` changes (this repo): pull and rebuild the image.
+- If `etl-database-schema` changes: `git pull` in the sibling checkout and rebuild the image.
+
+Example:
+```bash
+# Update this repo
+git pull
+
+# Update the schema repo (sibling to this repo)
+cd ../etl-database-schema && git pull
+
+# Rebuild the local image (restages schema into .local/ and rebuilds)
+cd -
+./packages/reporting_seeder/scripts/build.sh
+```
+
 ## Notes
 - Jobs orchestrate; processors handle concurrency and circuit breaking; repositories hold SQL for manifests/materialized views/history tables.
 - Tests should use DI to inject fakes/mocks for DB/S3/other external resources.

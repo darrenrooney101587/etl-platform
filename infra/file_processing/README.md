@@ -28,6 +28,63 @@
 > ./scripts/manage.sh destroy
 > ```
 
+## Developer workflows
+
+### A) Run the container locally (fast iteration)
+
+The module Dockerfile lives under the package:
+- `packages/file_processing/file-processing.Dockerfile`
+
+Build it:
+```bash
+docker build -f packages/file_processing/file-processing.Dockerfile -t file-processing:local .
+```
+
+Run the SNS listener locally:
+```bash
+docker run --rm -p 8080:8080 \
+  -e PYTHONUNBUFFERED=1 \
+  -e PORT=8080 \
+  file-processing:local \
+  python -m file_processing.cli.sns_main
+```
+
+### B) LocalStack (mimic AWS actions)
+
+Use the module wrapper script (delegates to `infra/local/scripts/setup_localstack.sh`):
+
+```bash
+cd infra/file_processing
+./scripts/setup_localstack.sh host.docker.internal 8080
+```
+
+This will:
+- start LocalStack (if needed)
+- create a perspective-specific S3 bucket and SNS topic
+- subscribe your local listener (`host.docker.internal:8080`) as an SNS HTTP endpoint
+
+You can then publish a test SNS message (see `infra/local/scripts/setup_localstack.sh` output + `scripts/sns_test_topic.sh`).
+
+### C) Push to `etl-playground` (AWS testing)
+
+Terraform lifecycle:
+```bash
+cd infra/file_processing
+./scripts/manage.sh init
+./scripts/manage.sh plan
+./scripts/manage.sh apply
+```
+
+Build + push image and update the running deployment:
+```bash
+cd infra/file_processing
+./scripts/manage.sh update-image
+```
+
+Notes:
+- This stack uses `aws_profile` / `aws_region` from `infra/file_processing/terraform/terraform.tfvars` (defaults: `etl-playground`, `us-gov-west-1`).
+- `./scripts/ecr_put.sh` pushes the image URI referenced in `infra/file_processing/terraform/container_image.txt`.
+
 This directory provisions a dedicated **EKS cluster** for the `file_processing` runtime plus the AWS wiring it needs (SNS topic and optional S3 bucket notifications). It is designed to run **after** `infra/foundation_network`, which owns the shared VPC/subnets/NAT/IGW.
 
 ---

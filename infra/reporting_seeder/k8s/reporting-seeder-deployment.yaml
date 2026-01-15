@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reporting-seeder
+  # If using IRSA, set the annotation below to the IAM role ARN for the service account
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/reporting-seeder-service-account-role
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting-seeder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reporting-seeder
+  template:
+    metadata:
+      labels:
+        app: reporting-seeder
+    spec:
+      serviceAccountName: reporting-seeder
+      containers:
+        - name: reporting-seeder
+          image: REPLACE_WITH_ECR_URI/reporting-seeder:latest
+          command: ["python", "-m", "reporting_seeder.cli.main"]
+          env:
+            - name: PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10

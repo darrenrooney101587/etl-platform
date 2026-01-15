@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# packages/reporting_seeder/build.sh
-# Helper to build the reporting_seeder Docker image from anywhere (uses repo root as build context).
+# packages/file_processing/build.sh
+# Helper to build the file_processing Docker image from anywhere (uses repo root as build context).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-PKG_NAME="reporting_seeder"
-IMAGE_NAME="etl-reporting-seeder"
+PKG_NAME="file_processing"
+IMAGE_NAME="etl-file-processing"
 DASHED="${PKG_NAME//_/-}"
 LOCAL_DOCKERFILE="$REPO_ROOT/packages/$PKG_NAME/${PKG_NAME}.Dockerfile"
 ALT_DOCKERFILE="$REPO_ROOT/docker/${DASHED}.Dockerfile"

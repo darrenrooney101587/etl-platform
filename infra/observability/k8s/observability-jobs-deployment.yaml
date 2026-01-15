@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: observability
+  # If using IRSA, set the annotation below to the IAM role ARN for the service account
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/observability-service-account-role
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: observability-jobs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: observability-jobs
+  template:
+    metadata:
+      labels:
+        app: observability-jobs
+    spec:
+      serviceAccountName: observability
+      containers:
+        - name: observability-jobs
+          image: REPLACE_WITH_ECR_URI/observability:latest
+          # Command should point to the job entrypoint for the observability package
+          # e.g., python -m observability.cli.main or another appropriate entrypoint
+          command: ["python", "-m", "observability.cli.main"]
+          env:
+            - name: PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
