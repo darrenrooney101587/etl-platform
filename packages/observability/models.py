@@ -1,4 +1,9 @@
-"""Django models for the signal notification system."""
+"""Model proxies aligned to existing reporting notification tables.
+
+These models mirror the upstream `reporting` schema and are kept `managed=True`
+so local tests can create tables via `migrate --run-syncdb`. In production the
+authoritative schema lives in the shared etl_database_schema package.
+"""
 from __future__ import annotations
 
 import uuid
@@ -8,8 +13,8 @@ from django.db import models
 from django.utils import timezone
 
 
-class Signal(models.Model):
-    """Append-only record of each signal occurrence."""
+class NotificationSignal(models.Model):
+    """Append-only notification signals."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -17,8 +22,8 @@ class Signal(models.Model):
     source = models.CharField(max_length=64)
     signal_type = models.CharField(max_length=128)
     severity = models.PositiveSmallIntegerField()
-    tenant_id = models.CharField(max_length=64)
-    tenant_code = models.CharField(max_length=64)
+    agency_id = models.CharField(max_length=64)
+    agency_slug = models.CharField(max_length=64)
     job_name = models.CharField(max_length=255)
     run_id = models.CharField(max_length=128, null=True, blank=True)
     task_id = models.CharField(max_length=128, null=True, blank=True)
@@ -30,15 +35,17 @@ class Signal(models.Model):
     details_json = models.JSONField(default=dict)
 
     class Meta:
+        db_table = "notification_signal"
+        managed = True
         indexes = [
             models.Index(fields=["fingerprint", "-occurred_at"], name="idx_signal_fp_occ"),
-            models.Index(fields=["tenant_id", "-occurred_at"], name="idx_signal_tenant_occ"),
+            models.Index(fields=["agency_id", "-occurred_at"], name="idx_signal_agency_occ"),
             models.Index(fields=["job_name", "-occurred_at"], name="idx_signal_job_occ"),
         ]
 
 
-class SignalGroup(models.Model):
-    """Stateful rollup of signals keyed by fingerprint."""
+class NotificationSignalGroup(models.Model):
+    """Stateful rollup keyed by fingerprint and agency."""
 
     class Status(models.TextChoices):
         OPEN = "open", "open"
@@ -50,8 +57,8 @@ class SignalGroup(models.Model):
     fingerprint = models.CharField(max_length=128, db_index=True)
     status = models.CharField(max_length=16, choices=Status.choices)
     current_severity = models.PositiveSmallIntegerField()
-    tenant_id = models.CharField(max_length=64)
-    tenant_code = models.CharField(max_length=64)
+    agency_id = models.CharField(max_length=64)
+    agency_slug = models.CharField(max_length=64)
     job_name = models.CharField(max_length=255)
     signal_type = models.CharField(max_length=128)
     first_seen_at = models.DateTimeField()
@@ -59,7 +66,7 @@ class SignalGroup(models.Model):
     count_total = models.PositiveIntegerField(default=0)
     count_24h = models.PositiveIntegerField(default=0)
     last_signal = models.ForeignKey(
-        Signal, on_delete=models.SET_NULL, null=True, blank=True, related_name="groups"
+        NotificationSignal, on_delete=models.SET_NULL, null=True, blank=True, related_name="groups"
     )
     assigned_to_user_id = models.CharField(max_length=64, null=True, blank=True)
     assigned_team_id = models.CharField(max_length=64, null=True, blank=True)
@@ -70,12 +77,16 @@ class SignalGroup(models.Model):
     last_reminded_at = models.DateTimeField(null=True, blank=True)
     last_daily_reminder_date = models.DateField(null=True, blank=True)
     last_escalated_at = models.DateTimeField(null=True, blank=True)
+    last_slack_updated_at = models.DateTimeField(null=True, blank=True)
+    slack_message_hash = models.CharField(max_length=64, null=True, blank=True)
     slack_channel_id = models.CharField(max_length=128, null=True, blank=True)
     slack_root_ts = models.CharField(max_length=128, null=True, blank=True)
-    ui_url = models.CharField(max_length=512)
+    ui_url = models.CharField(max_length=512, null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        db_table = "notification_signal_group"
+        managed = True
         indexes = [
             models.Index(
                 fields=["status", "current_severity", "-last_seen_at"], name="idx_group_status_sev_seen"
@@ -84,24 +95,23 @@ class SignalGroup(models.Model):
                 fields=["assigned_to_user_id", "status", "-last_seen_at"],
                 name="idx_group_assignee_status_seen",
             ),
-            models.Index(fields=["tenant_id", "status", "-last_seen_at"], name="idx_group_tenant_status_seen"),
+            models.Index(fields=["agency_id", "status", "-last_seen_at"], name="idx_group_agency_status_seen"),
             models.Index(fields=["fingerprint", "status"], name="idx_group_fingerprint_status"),
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["fingerprint"],
+                fields=["agency_id", "fingerprint"],
                 condition=models.Q(status__in=["open", "acknowledged", "snoozed"]),
-                name="uniq_active_group_per_fingerprint",
+                name="uniq_active_group_per_agency_fingerprint",
             )
         ]
 
     def update_counts(self, occurrence_time) -> None:
-        """Update counters and timestamps using the provided occurrence time."""
         self.last_seen_at = max(self.last_seen_at, occurrence_time)
         self.count_total = self.count_total + 1
 
 
-class SignalGroupActivity(models.Model):
+class NotificationSignalGroupActivity(models.Model):
     """Audit trail of state changes and system actions."""
 
     class ActorType(models.TextChoices):
@@ -109,7 +119,7 @@ class SignalGroupActivity(models.Model):
         USER = "user", "user"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    signal_group = models.ForeignKey(SignalGroup, on_delete=models.CASCADE, related_name="activities")
+    signal_group = models.ForeignKey(NotificationSignalGroup, on_delete=models.CASCADE, related_name="activities")
     created_at = models.DateTimeField(auto_now_add=True)
     actor_type = models.CharField(max_length=16, choices=ActorType.choices)
     actor_user_id = models.CharField(max_length=64, null=True, blank=True)
@@ -117,6 +127,8 @@ class SignalGroupActivity(models.Model):
     metadata_json = models.JSONField(default=dict)
 
     class Meta:
+        db_table = "notification_signal_group_activity"
+        managed = True
         indexes = [
             models.Index(
                 fields=["signal_group", "-created_at"], name="idx_activity_group_created_at"
@@ -124,34 +136,47 @@ class SignalGroupActivity(models.Model):
         ]
 
 
-class TenantOwner(models.Model):
-    """Primary ownership mapping per tenant."""
+class NotificationAgencyOwner(models.Model):
+    """Primary ownership mapping per agency."""
 
-    tenant_id = models.CharField(max_length=64, unique=True)
+    id = models.BigAutoField(primary_key=True)
+    agency_id = models.CharField(max_length=64, unique=True)
     primary_owner_user_id = models.CharField(max_length=64)
     secondary_owner_user_id = models.CharField(max_length=64, null=True, blank=True)
     owning_team_id = models.CharField(max_length=64, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = "notification_agency_owner"
+        managed = True
 
-class JobOwnerOverride(models.Model):
+
+class NotificationJobOwnerOverride(models.Model):
     """Per-job ownership override."""
 
-    tenant_id = models.CharField(max_length=64, null=True, blank=True)
+    id = models.BigAutoField(primary_key=True)
+    agency_id = models.CharField(max_length=64, null=True, blank=True)
     job_name = models.CharField(max_length=255)
     owner_user_id = models.CharField(max_length=64, null=True, blank=True)
     team_id = models.CharField(max_length=64, null=True, blank=True)
 
     class Meta:
-        unique_together = ("tenant_id", "job_name")
+        db_table = "notification_job_owner_override"
+        managed = True
+        unique_together = ("agency_id", "job_name")
 
 
-class UserSlackMap(models.Model):
+class NotificationUserSlackMap(models.Model):
     """Mapping between internal user ids and Slack user ids."""
 
+    id = models.BigAutoField(primary_key=True)
     user_id = models.CharField(max_length=64, unique=True)
     slack_user_id = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "notification_user_slack_map"
+        managed = True
 
 
 OwnerResolution = Dict[str, Optional[str]]

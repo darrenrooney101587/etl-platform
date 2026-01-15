@@ -10,7 +10,11 @@ from django.utils import timezone
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from observability.models import Signal, SignalGroup, SignalGroupActivity
+from observability.models import (
+    NotificationSignal,
+    NotificationSignalGroup,
+    NotificationSignalGroupActivity,
+)
 from observability.services.grouping import SlackNotifier
 
 logger = logging.getLogger(__name__)
@@ -24,7 +28,7 @@ class SlackConnector(SlackNotifier):
         self.client = WebClient(token=slack_token) if slack_token else None
         self.shared_channel_id = shared_channel_id or getattr(settings, "SLACK_SHARED_CHANNEL_ID", "")
 
-    def post_group_opened(self, group: SignalGroup, signal: Signal) -> None:
+    def post_group_opened(self, group: NotificationSignalGroup, signal: NotificationSignal) -> None:
         if not self.client or not self.shared_channel_id:
             return
         if group.slack_root_ts and group.slack_channel_id:
@@ -47,13 +51,16 @@ class SlackConnector(SlackNotifier):
             group.slack_channel_id = response.get("channel")
             group.slack_root_ts = response.get("ts")
             group.opened_notified_at = timezone.now()
-            group.save(update_fields=["slack_channel_id", "slack_root_ts", "opened_notified_at"])
+            group.last_slack_updated_at = timezone.now()
+            group.save(update_fields=["slack_channel_id", "slack_root_ts", "opened_notified_at", "last_slack_updated_at"])
             self._log_activity(group, "slack_posted", {"channel": group.slack_channel_id, "ts": group.slack_root_ts})
         except SlackApiError:
             logger.warning("Failed to post Slack message for group %s", group.id, exc_info=True)
 
-    def update_group_acknowledged(self, group: SignalGroup, slack_user_id: Optional[str]) -> None:
+    def update_group_acknowledged(self, group: NotificationSignalGroup, slack_user_id: Optional[str]) -> None:
         if not self.client or not group.slack_root_ts or not group.slack_channel_id:
+            return
+        if group.last_slack_updated_at and (timezone.now() - group.last_slack_updated_at).total_seconds() < 300:
             return
         try:
             context = self._ack_context(slack_user_id)
@@ -64,6 +71,9 @@ class SlackConnector(SlackNotifier):
                 text=self._fallback_text(group),
                 blocks=blocks,
             )
+            group.last_slack_updated_at = timezone.now()
+            group.slack_message_hash = context
+            group.save(update_fields=["last_slack_updated_at", "slack_message_hash"])
             self._log_activity(
                 group,
                 "slack_updated",
@@ -72,7 +82,7 @@ class SlackConnector(SlackNotifier):
         except SlackApiError:
             logger.warning("Failed to update Slack message for group %s", group.id, exc_info=True)
 
-    def send_owner_reminder(self, group: SignalGroup, slack_user_id: str) -> None:
+    def send_owner_reminder(self, group: NotificationSignalGroup, slack_user_id: str) -> None:
         if not self.client:
             return
         try:
@@ -89,7 +99,7 @@ class SlackConnector(SlackNotifier):
         except SlackApiError:
             logger.warning("Failed to send reminder for group %s to user %s", group.id, slack_user_id, exc_info=True)
 
-    def post_digest(self, groups: List[SignalGroup], digest_date: date) -> None:
+    def post_digest(self, groups: List[NotificationSignalGroup], digest_date: date) -> None:
         if not self.client or not self.shared_channel_id:
             return
         lines = [

@@ -1,52 +1,37 @@
-# Observability
+# Observability Notification Backend (Job-Driven)
 
-Signal-based notification system for ETL workflows.
+Backend processing layer for Signal/Signal Group notifications. Runs as ad-hoc or scheduled Kubernetes Jobs/CronJobs (no web endpoints or long-lived services).
 
-## Features
+## Responsibilities
+- Ingest operational signals into existing `notification_*` tables
+- Fingerprint + group signals deterministically
+- Maintain lifecycle and ownership routing
+- Send/update Slack messages (shared channel + owner DMs)
+- Dispatch reminders and daily digest on fixed schedules
 
-- Signal ingestion API with deterministic fingerprinting and grouping
-- Stateful `SignalGroup` workflow (open → acknowledged → snoozed/closed)
-- Slack connector (shared channel post, acknowledgement update, DM reminders, daily digest)
-- Ownership routing (tenant + job overrides)
-- Reminder dispatcher and daily digest jobs (CLI + worker loop)
-- Dockerized API/worker plus Terraform module for notification resources
+## Commands (executed via jobs)
+- `python -m observability.jobs.ingest_airflow`
+- `python -m observability.jobs.ingest_cloverdx`
+- `python -m observability.jobs.ingest_dq`
+- `python -m observability.jobs.reminder_dispatcher`
+- `python -m observability.jobs.daily_digest`
 
-## Running locally
-
-```bash
-# Start API, worker, Postgres, and Redis
-cd compose
-docker-compose up --build observability-api observability-worker postgres redis
-```
-
-The API listens on `http://localhost:8000`.
-
-## Configuration
-
-Environment variables (with safe defaults for local use):
-
-- `DATABASE_URL` (defaults to SQLite when unset)
-- `SLACK_BOT_TOKEN`
-- `SLACK_SIGNING_SECRET`
-- `SLACK_SHARED_CHANNEL_ID`
-- `APP_BASE_URL` (default `http://localhost:8000`)
-- `INTERNAL_INGEST_TOKEN`
-- `REOPEN_WINDOW_HOURS` (default `24`)
-- `ACTIVE_WINDOW_MINUTES` (default `120`)
-- `REMINDER_T2_HOURS` (default `2`)
-- `REMINDER_T8_HOURS` (default `8`)
-- `DAILY_DIGEST_TIME` (default `09:00`)
-
-## Jobs and CLI
-
-CLI entrypoint: `observability.cli.main` (console script `etl-observe`).
-
-Available jobs:
-
-- `reminder_dispatcher` – DM owners for open/ack groups (rate limited)
-- `daily_digest` – Post shared-channel digest once per day
-
+Use the package CLI helper for discovery:
 ```bash
 PYTHONPATH=packages python -m observability.cli.main list
 PYTHONPATH=packages python -m observability.cli.main run reminder_dispatcher
 ```
+
+## Configuration
+- `DATABASE_URL`
+- `SLACK_BOT_TOKEN`
+- `SLACK_SIGNING_SECRET`
+- `SLACK_SHARED_CHANNEL_ID`
+- `APP_BASE_URL`
+- `REOPEN_WINDOW_HOURS` (default `24`)
+- `REMINDER_T2_HOURS` (default `2`)
+- `REMINDER_T8_HOURS` (default `8`)
+- `DAILY_DIGEST_TIME` (default `09:00`)
+
+## Schema
+Authoritative tables live in the shared schema repo (`reporting.notification_*`). See `schema.md` for field alignment and backend-only additions.

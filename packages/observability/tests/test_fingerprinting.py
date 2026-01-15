@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from observability.fingerprinting import compute_fingerprint, normalize_error_message
+from etl_core.support.fingerprinting import compute_fingerprint, normalize_error_message
 
 
 class FingerprintingTests(unittest.TestCase):

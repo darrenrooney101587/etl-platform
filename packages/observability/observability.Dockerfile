@@ -17,5 +17,5 @@ RUN pip install --no-cache-dir django==4.2.27 slack_sdk==3.39.0 psycopg2-binary=
 # Ensure package parent directory is on PYTHONPATH
 ENV PYTHONPATH=/app/packages
 
-# Entrypoint: run the API service by default
-ENTRYPOINT ["python", "-m", "observability.server"]
+# Entrypoint: job-driven execution via CLI
+ENTRYPOINT ["python", "-m", "observability.cli.main"]

@@ -17,7 +17,7 @@ services:
       - ../packages/data_pipeline:/app/packages/data_pipeline
       - ../packages/etl_core:/app/packages/etl_core
 
-  observability-api:
+  observability:
     image: etl-observability
     build:
       context: ../
@@ -25,48 +25,3 @@ services:
     volumes:
       - ../packages/observability:/app/packages/observability
       - ../packages/etl_core:/app/packages/etl_core
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
-      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
-      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
-      - SLACK_SHARED_CHANNEL_ID=${SLACK_SHARED_CHANNEL_ID:-}
-      - APP_BASE_URL=http://localhost:8000
-      - INTERNAL_INGEST_TOKEN=${INTERNAL_INGEST_TOKEN:-changeme}
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
-      - redis
-    command: ["python", "-m", "observability.server"]
-
-  observability-worker:
-    image: etl-observability
-    build:
-      context: ../
-      dockerfile: ../packages/observability/observability.Dockerfile
-    volumes:
-      - ../packages/observability:/app/packages/observability
-      - ../packages/etl_core:/app/packages/etl_core
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
-      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
-      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
-      - SLACK_SHARED_CHANNEL_ID=${SLACK_SHARED_CHANNEL_ID:-}
-      - APP_BASE_URL=http://localhost:8000
-      - INTERNAL_INGEST_TOKEN=${INTERNAL_INGEST_TOKEN:-changeme}
-    depends_on:
-      - postgres
-      - redis
-    command: ["python", "-m", "observability.worker", "--interval-minutes", "15"]
-
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-
-  redis:
-    image: redis:7
-    ports:
-      - "6379:6379"

@@ -1,4 +1,4 @@
-"""Fingerprint normalization helpers for signals."""
+"""Shared fingerprint normalization utilities."""
 from __future__ import annotations
 
 import hashlib
