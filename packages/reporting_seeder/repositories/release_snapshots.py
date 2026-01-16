@@ -38,10 +38,15 @@ class ReleaseSnapshotRepository:
 
             return SeederReleaseSnapshot
         except Exception as exc:  # pragma: no cover - runtime dependency
-            raise RuntimeError(
-                "Release snapshot models are not available. Ensure DJANGO_SETTINGS_MODULE is set "
-                "and reporting_seeder.django_bootstrap.bootstrap_django(...) has been called before using ReleaseSnapshotRepository."
-            ) from exc
+            try:
+                from reporting_seeder.models import SeederReleaseSnapshot
+
+                return SeederReleaseSnapshot
+            except Exception as fallback_exc:  # pragma: no cover - runtime dependency
+                raise RuntimeError(
+                    "Release snapshot models are not available. Ensure DJANGO_SETTINGS_MODULE is set "
+                    "and reporting_seeder.django_bootstrap.bootstrap_django(...) has been called before using ReleaseSnapshotRepository."
+                ) from fallback_exc
 
     def create_snapshot(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
         """Persist a release snapshot via the ORM.
@@ -129,6 +134,7 @@ class ReleaseSnapshotRepository:
         :rtype: int
         """
         formatted_table = _format_table_name(table_name)
+        # Identifiers are validated and quoted in _format_table_name.
         sql = f"SELECT COUNT(*) AS total_rows FROM {formatted_table}"
         rows = self._db.execute_query(sql)
         if not rows:
@@ -156,6 +162,7 @@ class ReleaseSnapshotRepository:
         :rtype: List[ColumnStat]
         """
         formatted_table = _format_table_name(table_name)
+        # Identifiers are validated and quoted in _format_table_name/_quote_identifier.
         allowlist = {col.strip() for col in (top_values_columns or []) if col and col.strip()}
         stats: List[ColumnStat] = []
         for column in columns:
@@ -214,6 +221,7 @@ class ReleaseSnapshotRepository:
         :returns: List of top values with counts and percentages.
         :rtype: List[TopValueStat]
         """
+        # Identifiers are validated and quoted before this SQL is composed.
         sql = f"""
         SELECT {quoted_column} AS value, COUNT(*) AS value_count
         FROM {formatted_table}
@@ -274,7 +282,7 @@ def _format_table_name(table_name: str) -> str:
 
     :param table_name: Table name with optional schema prefix.
     :type table_name: str
-    :returns: Quoted table reference.
+    :returns: Quoted table reference (validated identifiers).
     :rtype: str
     """
     schema, name = _split_table_name(table_name)

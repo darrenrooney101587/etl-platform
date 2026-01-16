@@ -51,6 +51,14 @@ class ReleaseSnapshotProcessor:
         start_time = time.monotonic()
         table_name = str(manifest["table_name"])
         released_at = released_at or datetime.now(timezone.utc)
+        columns: Sequence[ColumnDefinition] = []
+        column_stats: Sequence[ColumnStat] = []
+        total_rows = 0
+        total_columns = 0
+        schema_hash = ""
+        status = "error"
+        snapshot_payload: Dict[str, Any]
+
         try:
             columns = self._snapshots.get_columns(table_name)
             schema_hash = build_schema_hash(columns)
@@ -64,12 +72,9 @@ class ReleaseSnapshotProcessor:
             total_columns = len(columns)
             status = "success"
         except Exception:
-            columns = []
-            column_stats = []
-            total_rows = 0
-            total_columns = 0
-            schema_hash = ""
             status = "error"
+            raise
+        finally:
             executed_at = datetime.now(timezone.utc)
             snapshot_payload = self._build_snapshot_payload(
                 manifest,
@@ -86,24 +91,8 @@ class ReleaseSnapshotProcessor:
                 column_stats,
             )
             self._snapshots.create_snapshot(snapshot_payload)
-            raise
 
-        executed_at = datetime.now(timezone.utc)
-        snapshot_payload = self._build_snapshot_payload(
-            manifest,
-            release_tag,
-            release_version,
-            released_at,
-            executed_at,
-            status,
-            int((time.monotonic() - start_time) * 1000),
-            total_rows,
-            total_columns,
-            schema_hash,
-            columns,
-            column_stats,
-        )
-        return self._snapshots.create_snapshot(snapshot_payload)
+        return snapshot_payload
 
     def compare_snapshots(
         self, base_snapshot: Mapping[str, Any], compare_snapshot: Mapping[str, Any]
