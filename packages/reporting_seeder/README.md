@@ -39,9 +39,11 @@ This package was updated to make materialized-view refreshes robust and operator
 
 - The seeder now distinguishes between two refresh modes:
   - Non-concurrent refresh (default and safe): `REFRESH MATERIALIZED VIEW <view>` — takes an exclusive lock on the materialized view while refreshing. Use during a low-traffic maintenance window.
-  - Concurrent refresh (Postgres `CONCURRENTLY`): `REFRESH MATERIALIZED VIEW CONCURRENTLY <view>` — avoids exclusive locking but requires the materialized view to have a unique index with no WHERE clause. The seeder will only attempt concurrent refresh when a unique index is present.
+  - Concurrent refresh (Postgres `CONCURRENTLY`): `REFRESH MATERIALIZED VIEW CONCURRENTLY <view>` — avoids exclusive locking but requires the materialized view to have a unique index with no WHERE clause. When concurrent refresh is enabled, the seeder will attempt it and automatically fall back to non-concurrent refresh if PostgreSQL reports the unique index prerequisite is not met.
 
 - Auto-creation of unique indexes has been intentionally removed. Creating a correct unique index requires domain knowledge about the view's data; automatically guessing a unique key is unsafe. Operators should create appropriate unique indexes via migrations or manual SQL when concurrent refresh is required.
+
+- The `has_unique_index` check has been removed from the codebase. We cannot guarantee that each materialized view will have a unique index. The refresh logic now relies on PostgreSQL's runtime error handling: when concurrent refresh is attempted on a view without a unique index, PostgreSQL raises an error which is caught and triggers an automatic fallback to non-concurrent refresh.
 
 - The processor collects PostgreSQL-side metrics (via `pg_stat_statements` / `pg_stat_activity`) where available, and records these in the seeder history tables so the team can observe DB-side cost (I/O, time) for each manifest.
 
@@ -61,7 +63,7 @@ Environment variables (defaults shown)
 - `SEEDER_MAX_DB_ACTIVE_QUERIES` (default: `0` = disabled) — when > 0 the processor polls `pg_stat_activity` before submitting each batch and waits while the total active (non-idle) DB queries are >= this threshold. This is a conservative DB-aware throttle across the whole DB instance.
 - `SEEDER_MAX_FAILURES` (default: `5`) — how many consecutive failures before the internal circuit breaker opens and stops new work temporarily.
 - `SEEDER_RESET_SECONDS` (default: `300`) — cooldown seconds after the circuit breaker opens.
-- `SEEDER_REFRESH_CONCURRENTLY` (default: `false`) — allow attempts at concurrent refresh when a unique index exists (the code will still skip CONCURRENTLY if the view lacks a unique index).
+- `SEEDER_REFRESH_CONCURRENTLY` (default: `false`) — when enabled, attempt concurrent refresh for all views. If a view lacks the required unique index, PostgreSQL will fail the concurrent refresh and the seeder will automatically fall back to non-concurrent refresh.
 
 Recommended conservative example for shared production DBs
 
