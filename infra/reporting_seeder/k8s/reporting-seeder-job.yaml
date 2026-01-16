@@ -4,7 +4,8 @@ metadata:
   name: reporting-seeder-run-once
   namespace: reporting-seeder
 spec:
-  backoffLimit: 1
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:
@@ -15,12 +16,7 @@ spec:
       containers:
         - name: reporting-seeder
           image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/reporting-seeder:latest
-          command:
-            - python
-            - -m
-            - reporting_seeder.cli.main
-            - run
-            - refresh_all
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: reporting-seeder-config
@@ -29,4 +25,6 @@ spec:
           env:
             - name: DJANGO_SETTINGS_MODULE
               value: "reporting_seeder.settings"
-          # No probes for job
+          command: ["sh", "-c"]
+          args:
+            - "python -m reporting_seeder.cli.main run \"${JOB_NAME}\""
