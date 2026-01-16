@@ -12,6 +12,7 @@ from reporting_seeder.repositories.release_snapshots import (
     ReleaseSnapshotRepository,
 )
 
+# Percentage delta returned when base value is zero but compare is non-zero.
 ZERO_BASE_DELTA_PCT = 100.0
 
 
