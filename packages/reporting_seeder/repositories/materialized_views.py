@@ -127,30 +127,15 @@ class MaterializedViewRepository:
 
         return False
 
-    def has_unique_index(self, table_name: str) -> bool:
-        """Check if the materialized view has a unique index (required for CONCURRENTLY)."""
-        parts = table_name.split(".")
-        if len(parts) == 2:
-            schema, name = parts
-        else:
-            schema, name = "public", table_name
-        sql = """
-        SELECT EXISTS (
-            SELECT 1
-            FROM pg_indexes
-            WHERE schemaname = %s
-              AND tablename = %s
-              AND indexdef ILIKE '%%unique%%'
-        ) AS has_unique
-        """
-        rows = self._db.execute_query(sql, [schema, name])
-        if rows:
-            return bool(rows[0].get("has_unique"))
-        return False
-
-    # Note: auto-creating unique indexes is intentionally removed. Creating
-    # indexes requires domain knowledge to pick safe unique keys and should be
-    # performed manually by DB owners or via a controlled migration process.
+    # Note: The has_unique_index check has been removed. We cannot guarantee that
+    # each materialized view will have a unique index. The refresh_view() method
+    # handles concurrent refresh failures gracefully by catching the PostgreSQL
+    # error and falling back to non-concurrent refresh automatically.
+    #
+    # Creating unique indexes requires domain knowledge to pick safe unique keys
+    # and should be performed manually by DB owners or via a controlled migration
+    # process. If CONCURRENTLY refresh is desired, ensure a proper unique index
+    # exists on the materialized view before enabling concurrent refresh.
 
     def get_view_stats(self, table_name: str) -> Dict[str, int]:
         """Return row count and total relation size (bytes) for the view."""

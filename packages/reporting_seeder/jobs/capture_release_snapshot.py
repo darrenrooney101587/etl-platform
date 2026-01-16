@@ -67,8 +67,8 @@ def entrypoint(argv: List[str]) -> int:
         return 1
 
     table_name = str(manifest["table_name"])
-    refresh_concurrently = config.refresh_concurrently and mv_repo.has_unique_index(table_name)
-    mv_repo.refresh_view(table_name, concurrently=refresh_concurrently)
+    # Pass concurrently flag directly; refresh_view handles fallback if no unique index
+    mv_repo.refresh_view(table_name, concurrently=config.refresh_concurrently)
     mv_repo.analyze_view(table_name)
 
     allowlist = _parse_csv(args.top_values_columns)
