@@ -72,16 +72,12 @@ def entrypoint(argv: List[str]) -> int:
     mv_repo.analyze_view(table_name)
 
     allowlist = _parse_csv(args.top_values_columns)
-    try:
-        processor.capture_snapshot(
-            manifest=manifest,
-            release_tag=release_tag,
-            release_version=args.release_version,
-            top_values_columns=allowlist,
-        )
-    except Exception:
-        logger.exception("Failed to capture release snapshot for %s", table_name)
-        return 1
+    processor.capture_snapshot(
+        manifest=manifest,
+        release_tag=release_tag,
+        release_version=args.release_version,
+        top_values_columns=allowlist,
+    )
 
     logger.info("Release snapshot captured for %s", table_name)
     return 0

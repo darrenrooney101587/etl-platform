@@ -133,10 +133,10 @@ class ReleaseSnapshotRepository:
         :returns: Row count.
         :rtype: int
         """
-        formatted_table = _format_table_name(table_name)
-        # Identifiers are validated and quoted in _format_table_name.
-        sql = f"SELECT COUNT(*) AS total_rows FROM {formatted_table}"
-        rows = self._db.execute_query(sql)
+        sql_module = _get_sql_module()
+        table_identifier = _get_table_identifier(table_name, sql_module)
+        query = sql_module.SQL("SELECT COUNT(*) AS total_rows FROM {}").format(table_identifier)
+        rows = self._db.execute_query(query)
         if not rows:
             return 0
         return int(rows[0].get("total_rows") or 0)
@@ -161,27 +161,30 @@ class ReleaseSnapshotRepository:
         :returns: List of per-column stats.
         :rtype: List[ColumnStat]
         """
-        formatted_table = _format_table_name(table_name)
-        # Identifiers are validated and quoted in _format_table_name/_quote_identifier.
+        sql_module = _get_sql_module()
+        table_identifier = _get_table_identifier(table_name, sql_module)
         allowlist = {col.strip() for col in (top_values_columns or []) if col and col.strip()}
         stats: List[ColumnStat] = []
         for column in columns:
             column_name = column["name"]
             column_type = column["type"]
-            quoted_column = _quote_identifier(column_name)
+            column_identifier = _get_column_identifier(column_name, sql_module)
             include_min_max = _is_numeric_type(column_type) or _is_date_type(column_type)
             include_avg = _is_numeric_type(column_type)
             select_parts = [
-                f"COUNT(*) FILTER (WHERE {quoted_column} IS NULL) AS null_count",
-                f"COUNT(DISTINCT {quoted_column}) AS distinct_count",
+                sql_module.SQL("COUNT(*) FILTER (WHERE {} IS NULL) AS null_count").format(column_identifier),
+                sql_module.SQL("COUNT(DISTINCT {}) AS distinct_count").format(column_identifier),
             ]
             if include_min_max:
-                select_parts.append(f"MIN({quoted_column}) AS min_value")
-                select_parts.append(f"MAX({quoted_column}) AS max_value")
+                select_parts.append(sql_module.SQL("MIN({}) AS min_value").format(column_identifier))
+                select_parts.append(sql_module.SQL("MAX({}) AS max_value").format(column_identifier))
             if include_avg:
-                select_parts.append(f"AVG({quoted_column}) AS avg_value")
-            sql = f"SELECT {', '.join(select_parts)} FROM {formatted_table}"
-            summary_rows = self._db.execute_query(sql)
+                select_parts.append(sql_module.SQL("AVG({}) AS avg_value").format(column_identifier))
+            query = sql_module.SQL("SELECT {fields} FROM {table}").format(
+                fields=sql_module.SQL(", ").join(select_parts),
+                table=table_identifier,
+            )
+            summary_rows = self._db.execute_query(query)
             summary = summary_rows[0] if summary_rows else {}
             null_count = int(summary.get("null_count") or 0)
             distinct_count = int(summary.get("distinct_count") or 0)
@@ -200,20 +203,20 @@ class ReleaseSnapshotRepository:
                 column_stat["avg"] = _coerce_json_value(summary.get("avg_value"))
             if _should_collect_top_values(column_name, column_type, distinct_count, allowlist):
                 column_stat["top_values"] = self._get_top_values(
-                    formatted_table, quoted_column, total_rows
+                    table_identifier, column_identifier, total_rows
                 )
             stats.append(column_stat)
         return stats
 
     def _get_top_values(
-        self, formatted_table: str, quoted_column: str, total_rows: int, limit: int = 5
+        self, table_identifier: Any, column_identifier: Any, total_rows: int, limit: int = 5
     ) -> List[TopValueStat]:
         """Fetch top value distribution for a column.
 
-        :param formatted_table: Quoted table reference.
-        :type formatted_table: str
-        :param quoted_column: Quoted column identifier.
-        :type quoted_column: str
+        :param table_identifier: psycopg2 SQL identifier for the table.
+        :type table_identifier: Any
+        :param column_identifier: psycopg2 SQL identifier for the column.
+        :type column_identifier: Any
         :param total_rows: Total row count for denominator.
         :type total_rows: int
         :param limit: Max number of values to return.
@@ -221,16 +224,16 @@ class ReleaseSnapshotRepository:
         :returns: List of top values with counts and percentages.
         :rtype: List[TopValueStat]
         """
-        # Identifiers are validated and quoted before this SQL is composed.
-        sql = f"""
-        SELECT {quoted_column} AS value, COUNT(*) AS value_count
-        FROM {formatted_table}
-        WHERE {quoted_column} IS NOT NULL
-        GROUP BY {quoted_column}
-        ORDER BY value_count DESC
-        LIMIT %s
-        """
-        rows = self._db.execute_query(sql, [limit])
+        sql_module = _get_sql_module()
+        query = sql_module.SQL(
+            "SELECT {column} AS value, COUNT(*) AS value_count "
+            "FROM {table} "
+            "WHERE {column} IS NOT NULL "
+            "GROUP BY {column} "
+            "ORDER BY value_count DESC "
+            "LIMIT %s"
+        ).format(column=column_identifier, table=table_identifier)
+        rows = self._db.execute_query(query, [limit])
         top_values: List[TopValueStat] = []
         for row in rows:
             count = int(row.get("value_count") or 0)
@@ -265,28 +268,46 @@ def _split_table_name(table_name: str) -> Tuple[str, str]:
     raise ValueError(f"Invalid table name: {table_name}")
 
 
-def _quote_identifier(identifier: str) -> str:
-    """Return a safely quoted SQL identifier.
+def _get_sql_module() -> Any:
+    """Return psycopg2.sql module for safe SQL composition.
 
-    :param identifier: Identifier to quote.
-    :type identifier: str
-    :returns: Quoted identifier string.
-    :rtype: str
+    :returns: psycopg2.sql module.
+    :rtype: Any
+    :raises RuntimeError: When psycopg2 is unavailable.
     """
-    _validate_identifier(identifier)
-    return f"\"{identifier.replace('\"', '\"\"')}\""
+    try:
+        from psycopg2 import sql
+    except Exception as exc:  # pragma: no cover - runtime dependency
+        raise RuntimeError("psycopg2 is required for snapshot SQL composition") from exc
+    return sql
 
 
-def _format_table_name(table_name: str) -> str:
-    """Format a fully qualified table name for SQL usage.
+def _get_table_identifier(table_name: str, sql_module: Any) -> Any:
+    """Create a qualified table identifier.
 
-    :param table_name: Table name with optional schema prefix.
+    :param table_name: Fully qualified or unqualified table name.
     :type table_name: str
-    :returns: Quoted table reference (validated identifiers).
-    :rtype: str
+    :param sql_module: psycopg2.sql module.
+    :type sql_module: Any
+    :returns: psycopg2 SQL identifier for the table.
+    :rtype: Any
     """
     schema, name = _split_table_name(table_name)
-    return f"{_quote_identifier(schema)}.{_quote_identifier(name)}"
+    return sql_module.Identifier(schema, name)
+
+
+def _get_column_identifier(column_name: str, sql_module: Any) -> Any:
+    """Create a column identifier for SQL composition.
+
+    :param column_name: Column name.
+    :type column_name: str
+    :param sql_module: psycopg2.sql module.
+    :type sql_module: Any
+    :returns: psycopg2 SQL identifier for the column.
+    :rtype: Any
+    """
+    _validate_identifier(column_name)
+    return sql_module.Identifier(column_name)
 
 
 def _is_numeric_type(column_type: str) -> bool:

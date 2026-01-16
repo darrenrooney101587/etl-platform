@@ -72,9 +72,6 @@ class ReleaseSnapshotProcessor:
             )
             total_columns = len(columns)
             status = "success"
-        except Exception:
-            status = "error"
-            raise
         finally:
             executed_at = datetime.now(timezone.utc)
             snapshot_payload = self._build_snapshot_payload(
@@ -411,11 +408,25 @@ def _calculate_overall_drift_score(
         score += 10.0
 
     for drift in column_drifts:
-        null_delta = abs(float(drift.get("nullPctDelta") or 0.0))
-        distinct_delta = abs(float(drift.get("distinctDelta") or 0.0))
+        null_delta = abs(_safe_float(drift.get("nullPctDelta")))
+        distinct_delta = abs(_safe_float(drift.get("distinctDelta")))
         if null_delta >= 10:
             score += 2.0
         if distinct_delta >= 10:
             score += 2.0
 
     return score
+
+
+def _safe_float(value: Any) -> float:
+    """Convert a value to float with a safe fallback.
+
+    :param value: Value to convert.
+    :type value: Any
+    :returns: Float value or 0.0 when conversion fails.
+    :rtype: float
+    """
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
