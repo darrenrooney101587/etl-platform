@@ -12,7 +12,7 @@ from reporting_seeder.repositories.release_snapshots import (
     ReleaseSnapshotRepository,
 )
 
-# Percentage delta returned when base value is zero but compare is non-zero.
+# Percentage delta returned when base value is zero; clamped to avoid infinities.
 ZERO_BASE_DELTA_PCT = 100.0
 
 
@@ -369,7 +369,7 @@ def _calculate_delta_pct(base_value: int, compare_value: int) -> float:
     :type base_value: int
     :param compare_value: Comparison value.
     :type compare_value: int
-    :returns: Delta percentage.
+    :returns: Delta percentage (clamped when base is zero).
     :rtype: float
     """
     if base_value == 0:

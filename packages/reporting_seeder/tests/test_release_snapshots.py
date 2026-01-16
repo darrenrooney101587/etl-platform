@@ -5,6 +5,7 @@ import unittest
 from typing import Any, Dict
 
 from reporting_seeder.processors.release_snapshots import (
+    ZERO_BASE_DELTA_PCT,
     build_schema_hash,
     compare_release_snapshots,
 )
@@ -73,7 +74,7 @@ class ReleaseSnapshotTests(unittest.TestCase):
 
         drift = compare_release_snapshots(base_snapshot, compare_snapshot)
         self.assertEqual(5, drift["rowCountDelta"])
-        self.assertEqual(100.0, drift["rowCountDeltaPct"])
+        self.assertEqual(ZERO_BASE_DELTA_PCT, drift["rowCountDeltaPct"])
 
 
 def _make_snapshot(
