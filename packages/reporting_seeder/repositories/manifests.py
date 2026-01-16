@@ -225,3 +225,47 @@ class ManifestRepository:
         """
         rows = self._db.execute_query(sql, [table_name, table_name])
         return rows[0] if rows else None
+
+    def get_manifest_by_id(self, manifest_id: int) -> Optional[Dict[str, object]]:
+        """Fetch a manifest by its id.
+
+        :param manifest_id: Manifest primary key.
+        :type manifest_id: int
+        :returns: Manifest row or None.
+        :rtype: Optional[Dict[str, object]]
+        """
+        sql = """
+        SELECT m.id,
+               m.table_name,
+               m.report_name,
+               m.agency_id,
+               a.name AS agency_name,
+               m.agency_slug,
+               m.query,
+               'custom' AS report_type,
+               m.database_id,
+               COALESCE(s.consecutive_failures, 0) AS consecutive_failures
+        FROM reporting.seeder_custom_report_manifest m
+        JOIN public.agency a ON a.id = m.agency_id
+        LEFT JOIN reporting.seeder_job_status s ON s.table_name = m.table_name
+        WHERE m.id = %s
+        UNION ALL
+        SELECT crm.id,
+               cr.table_name,
+               cr.report_name,
+               crm.agency_id,
+               a.name AS agency_name,
+               crm.agency_slug,
+               cr.query,
+               'canned' AS report_type,
+               cr.database_id,
+               COALESCE(s.consecutive_failures, 0) AS consecutive_failures
+        FROM reporting.seeder_canned_report_manifest crm
+                 JOIN reporting.seeder_canned_report cr ON cr.id = crm.canned_report_id
+                 JOIN public.agency a ON a.id = crm.agency_id
+                 LEFT JOIN reporting.seeder_job_status s ON s.table_name = cr.table_name
+        WHERE crm.id = %s
+        LIMIT 1
+        """
+        rows = self._db.execute_query(sql, [manifest_id, manifest_id])
+        return rows[0] if rows else None

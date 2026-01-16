@@ -14,6 +14,26 @@ Daily materialized view refresh for agency reporting queries (custom + canned). 
 - Processors: reusable business logic (concurrency, circuit breaking, transforms). Accept typed dataclasses and client dependencies via constructor injection.
 - Repositories: contain domain SQL and data-shaping logic; accept a `DatabaseClient` via constructor injection.
 
+## Release snapshots (schema/shape drift)
+Release snapshots capture immutable schema/shape metadata for a materialized view at a specific release tag. This is separate from Job History: job history tracks execution runs, while release snapshots record the schema/shape state of the view at a release.
+
+Snapshots are persisted in `reporting.seeder_release_snapshot` and include schema hashes, row/column counts, per-column null/distinct stats, and optional top-value distributions. Drift comparisons are computed in the backend so the UI does not need to diff snapshots itself.
+
+Capture a release snapshot:
+
+```bash
+cd packages/reporting_seeder
+poetry run python -m cli.main run capture_release_snapshot -- \
+  --table-name reporting.reports \
+  --release-tag abc123 \
+  --release-version v1.2.3 \
+  --top-values-columns status,category
+```
+
+Service helpers for APIs live in `reporting_seeder.services.release_snapshots`:
+- `list_release_snapshots_by_table(table_name, limit=50)`
+- `compare_release_snapshots_by_id(base_snapshot_id, compare_snapshot_id)`
+
 ## Recent behavior & important operator notes
 This package was updated to make materialized-view refreshes robust and operator-friendly for production usage. Key points:
 
