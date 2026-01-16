@@ -9,7 +9,18 @@ import json
 import logging
 import os
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+from django import setup as django_setup
+from django.apps import apps
+from etl_database_schema.apps.bms_reporting.models import (
+    MonitoringFile as ORMMonitoringFile,
+    MonitoringFileRun as ORMMonitoringFileRun,
+    MonitoringFileDataQuality as ORMMonitoringFileDataQuality,
+    MonitoringFileDataProfile as ORMMonitoringFileDataProfile,
+    MonitoringFileSchemaDefinition as ORMSchemaDefinition,
+    MonitoringFileSchemaDefinitionVersion as ORMSchemaDefinitionVersion,
+)
 
 from etl_core.database.client import DatabaseClient
 from file_processing.models.monitoring import (
@@ -23,34 +34,41 @@ from file_processing.models.monitoring import (
 logger = logging.getLogger(__name__)
 
 
-# --- ORM helpers ---------------------------------------------------------
-def _import_monitoring_models() -> Optional[tuple]:
-    """Attempt to import upstream ORM models from etl_database_schema.
+def _bootstrap_django_if_needed(settings_module: str = "file_processing.settings") -> None:
+    """Ensure Django is configured before ORM access.
 
-    Returns a tuple:
-      (ORMMonitoringFile, ORMMonitoringFileRun, ORMMonitoringFileDataQuality, ORMMonitoringFileDataProfile, ORMSchemaDefinition, ORMSchemaDefinitionVersion)
-    or None if import fails.
+    Raises RuntimeError if settings are missing or bootstrap fails.
     """
-    try:
-        from etl_database_schema.apps.bms_reporting.models import (
-            MonitoringFile as ORMMonitoringFile,
-            MonitoringFileRun as ORMMonitoringFileRun,
-            MonitoringFileDataQuality as ORMMonitoringFileDataQuality,
-            MonitoringFileDataProfile as ORMMonitoringFileDataProfile,
-            MonitoringFileSchemaDefinition as ORMSchemaDefinition,
-            MonitoringFileSchemaDefinitionVersion as ORMSchemaDefinitionVersion,
+    current = os.environ.get("DJANGO_SETTINGS_MODULE")
+    if current and current != settings_module:
+        raise RuntimeError(
+            f"DJANGO_SETTINGS_MODULE already set to '{current}', expected '{settings_module}'"
         )
+    if apps.ready:
+        return
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", settings_module)
+    django_setup()
 
-        return (
-            ORMMonitoringFile,
-            ORMMonitoringFileRun,
-            ORMMonitoringFileDataQuality,
-            ORMMonitoringFileDataProfile,
-            ORMSchemaDefinition,
-            ORMSchemaDefinitionVersion,
-        )
-    except Exception:
-        return None
+
+# --- ORM helpers ---------------------------------------------------------
+def _import_monitoring_models() -> Tuple[
+    type[ORMMonitoringFile],
+    type[ORMMonitoringFileRun],
+    type[ORMMonitoringFileDataQuality],
+    type[ORMMonitoringFileDataProfile],
+    type[ORMSchemaDefinition],
+    type[ORMSchemaDefinitionVersion],
+]:
+    """Import upstream ORM models; requires Django to be bootstrapped."""
+    _bootstrap_django_if_needed()
+    return (
+        ORMMonitoringFile,
+        ORMMonitoringFileRun,
+        ORMMonitoringFileDataQuality,
+        ORMMonitoringFileDataProfile,
+        ORMSchemaDefinition,
+        ORMSchemaDefinitionVersion,
+    )
 
 
 class MonitoringRepository:
@@ -80,108 +98,107 @@ class MonitoringRepository:
     ) -> Optional[MonitoringFile]:
         """Look up a monitoring file by agency slug and file name.
 
-        Prefer ORM lookup when possible, otherwise use SQL fallback.
+        Prefer ORM lookup when possible; requires Django settings.
         """
-        # Attempt ORM first
         orm = _import_monitoring_models()
-        if orm:
-            (
-                ORMMonitoringFile,
-                ORMMonitoringFileRun,
-                ORMMonitoringFileDataQuality,
-                ORMMonitoringFileDataProfile,
-                ORMSchemaDefinition,
-                ORMSchemaDefinitionVersion,
-            ) = orm
-            try:
-                # Resolve environment mapping same as SQL path
-                environment = (os.getenv("ENVIRONMENT", "prod") or "prod").strip().lower()
-                if environment in ("production", "prod", "prod-etl", "prod_etl", "production-etl"):
-                    environment = "prod"
-                if environment not in ("prod", "qa", "sandbox"):
-                    environment = "prod"
+        (
+            ORMMonitoringFile,
+            ORMMonitoringFileRun,
+            ORMMonitoringFileDataQuality,
+            ORMMonitoringFileDataProfile,
+            ORMSchemaDefinition,
+            ORMSchemaDefinitionVersion,
+        ) = orm
 
-                mapping_sql = f"SELECT {environment}_bms_slug, {environment}_bms_id FROM reporting.ref_agency_designations WHERE {environment}_s3_slug = %s"
-                mapping_rows = self._db.execute_query(mapping_sql, [agency_slug]) if self._db else []
+        try:
+            # Resolve environment mapping same as SQL path
+            environment = (os.getenv("ENVIRONMENT", "prod") or "prod").strip().lower()
+            if environment in ("production", "prod", "prod-etl", "prod_etl", "production-etl"):
+                environment = "prod"
+            if environment not in ("prod", "qa", "sandbox"):
+                environment = "prod"
 
-                internal_slug = agency_slug
-                bms_id: Optional[int] = None
-                if mapping_rows:
-                    mapped = mapping_rows[0]
-                    bms_slug = mapped.get(f"{environment}_bms_slug")
-                    mapped_bms_id = mapped.get(f"{environment}_bms_id")
-                    if bms_slug:
-                        internal_slug = bms_slug
-                    if mapped_bms_id:
-                        try:
-                            bms_id = int(mapped_bms_id)
-                        except Exception:
-                            bms_id = None
+            mapping_sql = f"SELECT {environment}_bms_slug, {environment}_bms_id FROM reporting.ref_agency_designations WHERE {environment}_s3_slug = %s"
+            mapping_rows = self._db.execute_query(mapping_sql, [agency_slug]) if self._db else []
 
-                qs = ORMMonitoringFile.objects.all()
-                if bms_id is not None:
-                    qs = qs.filter(agency_id=bms_id, file_name=file_name)
-                else:
-                    qs = qs.filter(agency_slug__iexact=internal_slug, file_name=file_name)
-
-                qs = qs.order_by("is_suppressed", "-id")
-                results = list(qs)
-
-                # Fallback to trying original s3 slug if none found
-                if not results and bms_id is not None:
-                    qs2 = ORMMonitoringFile.objects.filter(agency_slug__iexact=agency_slug, file_name=file_name).order_by("is_suppressed", "-id")
-                    results = list(qs2)
-                if not results and internal_slug != agency_slug:
-                    qs3 = ORMMonitoringFile.objects.filter(agency_slug__iexact=agency_slug, file_name=file_name).order_by("is_suppressed", "-id")
-                    results = list(qs3)
-
-                if not results:
-                    # try filename-only fallback
+            internal_slug = agency_slug
+            bms_id: Optional[int] = None
+            if mapping_rows:
+                mapped = mapping_rows[0]
+                bms_slug = mapped.get(f"{environment}_bms_slug")
+                mapped_bms_id = mapped.get(f"{environment}_bms_id")
+                if bms_slug:
+                    internal_slug = bms_slug
+                if mapped_bms_id:
                     try:
-                        fallback = ORMMonitoringFile.objects.filter(file_name=file_name).order_by("is_suppressed", "-id").first()
-                        if fallback:
-                            logger.warning(
-                                "No monitoring_file for agency=%s (internal=%s) file=%s; falling back to file_name-only match id=%s agency=%s",
-                                agency_slug,
-                                internal_slug,
-                                file_name,
-                                fallback.id,
-                                fallback.agency_slug,
-                            )
-                            return MonitoringFile(
-                                id=fallback.id,
-                                file_name=fallback.file_name,
-                                agency_slug=fallback.agency_slug,
-                                latest_data_quality_score=getattr(fallback, "latest_data_quality_score", None),
-                                schema_definition_id=(getattr(fallback, "schema_definition_id", None) or (fallback.schema_definition.id if getattr(fallback, "schema_definition", None) else None)),
-                                schema_definition_version_id=(getattr(fallback, "schema_definition_version_id", None) or (fallback.schema_definition_version.id if getattr(fallback, "schema_definition_version", None) else None)),
-                                is_suppressed=getattr(fallback, "is_suppressed", False),
-                            )
+                        bms_id = int(mapped_bms_id)
                     except Exception:
-                        logger.exception("Fallback ORM lookup by file_name failed")
-                        return None
+                        bms_id = None
+
+            qs = ORMMonitoringFile.objects.all()
+            if bms_id is not None:
+                qs = qs.filter(agency_id=bms_id, file_name=file_name)
+            else:
+                qs = qs.filter(agency_slug__iexact=internal_slug, file_name=file_name)
+
+            qs = qs.order_by("is_suppressed", "-id")
+            results = list(qs)
+
+            # Fallback to trying original s3 slug if none found
+            if not results and bms_id is not None:
+                qs2 = ORMMonitoringFile.objects.filter(agency_slug__iexact=agency_slug, file_name=file_name).order_by("is_suppressed", "-id")
+                results = list(qs2)
+            if not results and internal_slug != agency_slug:
+                qs3 = ORMMonitoringFile.objects.filter(agency_slug__iexact=agency_slug, file_name=file_name).order_by("is_suppressed", "-id")
+                results = list(qs3)
+
+            if not results:
+                # try filename-only fallback
+                try:
+                    fallback = ORMMonitoringFile.objects.filter(file_name=file_name).order_by("is_suppressed", "-id").first()
+                    if fallback:
+                        logger.warning(
+                            "No monitoring_file for agency=%s (internal=%s) file=%s; falling back to file_name-only match id=%s agency=%s",
+                            agency_slug,
+                            internal_slug,
+                            file_name,
+                            fallback.id,
+                            fallback.agency_slug,
+                        )
+                        return MonitoringFile(
+                            id=fallback.id,
+                            file_name=fallback.file_name,
+                            agency_slug=fallback.agency_slug,
+                            latest_data_quality_score=getattr(fallback, "latest_data_quality_score", None),
+                            schema_definition_id=(getattr(fallback, "schema_definition_id", None) or (fallback.schema_definition.id if getattr(fallback, "schema_definition", None) else None)),
+                            schema_definition_version_id=(getattr(fallback, "schema_definition_version_id", None) or (fallback.schema_definition_version.id if getattr(fallback, "schema_definition_version", None) else None)),
+                            is_suppressed=getattr(fallback, "is_suppressed", False),
+                        )
+                except Exception:
+                    logger.exception("Fallback ORM lookup by file_name failed")
                     return None
+                return None
 
-                # If multiple, apply s3_key disambiguation
-                selected = results[0]
-                if s3_key and len(results) > 1:
-                    search_suffix = s3_key.strip().lstrip("/")
-                    matches = [r for r in results if r.s3_url and (r.s3_url == search_suffix or r.s3_url.endswith("/" + search_suffix))]
-                    if matches:
-                        selected = matches[0]
+            # If multiple, apply s3_key disambiguation
+            selected = results[0]
+            if s3_key and len(results) > 1:
+                search_suffix = s3_key.strip().lstrip("/")
+                matches = [r for r in results if r.s3_url and (r.s3_url == search_suffix or r.s3_url.endswith("/" + search_suffix))]
+                if matches:
+                    selected = matches[0]
 
-                return MonitoringFile(
-                    id=selected.id,
-                    file_name=selected.file_name,
-                    agency_slug=selected.agency_slug,
-                    latest_data_quality_score=getattr(selected, "latest_data_quality_score", None),
-                    schema_definition_id=(getattr(selected, "schema_definition_id", None) or (selected.schema_definition.id if getattr(selected, "schema_definition", None) else None)),
-                    schema_definition_version_id=(getattr(selected, "schema_definition_version_id", None) or (selected.schema_definition_version.id if getattr(selected, "schema_definition_version", None) else None)),
-                    is_suppressed=getattr(selected, "is_suppressed", False),
-                )
-            except Exception:
-                # If ORM path errors, fall through to SQL fallback
-                logger.exception("ORM path failed in get_monitoring_file; falling back to SQL")
+            return MonitoringFile(
+                id=selected.id,
+                file_name=selected.file_name,
+                agency_slug=selected.agency_slug,
+                latest_data_quality_score=getattr(selected, "latest_data_quality_score", None),
+                schema_definition_id=(getattr(selected, "schema_definition_id", None) or (selected.schema_definition.id if getattr(selected, "schema_definition", None) else None)),
+                schema_definition_version_id=(getattr(selected, "schema_definition_version_id", None) or (selected.schema_definition_version.id if getattr(selected, "schema_definition_version", None) else None)),
+                is_suppressed=getattr(selected, "is_suppressed", False),
+            )
+        except Exception:
+            # If ORM path errors, fall through to SQL fallback
+            logger.exception("ORM path failed in get_monitoring_file; falling back to SQL")
 
         # Resolve internal BMS ID or slug using ref_agency_designations mapping if possible
         environment = (os.getenv("ENVIRONMENT", "prod") or "prod").strip().lower()

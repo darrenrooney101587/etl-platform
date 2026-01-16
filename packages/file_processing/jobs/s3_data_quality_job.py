@@ -153,6 +153,12 @@ def entrypoint(argv: List[str]) -> int:
 
         # Initialize dependencies
         try:
+            # Require Django settings for ORM-backed repository access
+            if not os.getenv("DJANGO_SETTINGS_MODULE"):
+                os.environ["DJANGO_SETTINGS_MODULE"] = "file_processing.settings"
+            import django  # type: ignore
+            django.setup()
+
             db_client = DatabaseClient()  # Config from env vars
             # S3Config requires bucket args even if not used by the processor which uses event.bucket
             s3_config = S3Config(

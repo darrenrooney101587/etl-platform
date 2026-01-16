@@ -20,13 +20,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
 from urllib.request import urlopen
 import time
-from file_processing.jobs.s3_data_quality_job import entrypoint
-from packages.etl_core.support.circuit_breaker import CircuitBreaker
+
+from etl_core.support.circuit_breaker import CircuitBreaker
 
 
 logger = logging.getLogger(__name__)
@@ -261,6 +262,9 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
         circuit_breaker = getattr(self, 'server', None)
         circuit_breaker = getattr(circuit_breaker, "circuit_breaker", None)
         try:
+            # Import the job entrypoint at runtime to avoid import-time Django/ORM
+            from file_processing.jobs.s3_data_quality_job import entrypoint  # type: ignore
+
             argv = ["--event-json", event_json]
             if trace_id:
                 argv.extend(["--trace-id", trace_id])
@@ -287,6 +291,20 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    # Bootstrap Django early so that importing etl_database_schema models works
+    # inside worker threads or repository modules. Allow DJANGO_SETTINGS_MODULE to
+    # be configured via env (preferred) otherwise default to package settings.
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "file_processing.settings"))
+    try:
+        # Deferred import so Django is only required at runtime when running the server.
+        import django  # type: ignore
+        django.setup()
+    except Exception:
+        # If Django isn't installed or bootstrap fails, we want the server to fail
+        # loudly during startup rather than crash unpredictably on the first job.
+        logger.exception("Failed to bootstrap Django. Ensure DJANGO_SETTINGS_MODULE and DB env are set.")
+        raise
+
     port = int(os.getenv("PORT", "8080"))
     server_address = ("", port)
     httpd = HTTPServer(server_address, SNSRequestHandler)

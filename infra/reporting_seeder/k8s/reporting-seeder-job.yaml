@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: reporting-seeder-run-once
+  namespace: reporting-seeder
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        job: reporting-seeder-run
+    spec:
+      serviceAccountName: reporting-seeder
+      restartPolicy: Never
+      containers:
+        - name: reporting-seeder
+          image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/reporting-seeder:latest
+          command:
+            - python
+            - -m
+            - reporting_seeder.cli.main
+            - run
+            - refresh_all
+          envFrom:
+            - configMapRef:
+                name: reporting-seeder-config
+            - secretRef:
+                name: reporting-seeder-secret
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: "reporting_seeder.settings"
+          # No probes for job

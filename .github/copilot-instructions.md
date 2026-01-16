@@ -71,6 +71,20 @@ All classes that talk to external resources (AWS, HTTP clients, DB connectors, r
   - `SECRET_KEY`: Can be a dummy value for non-web jobs.
 - **Bootstrapping:** Job entrypoints must strictly check for `DJANGO_SETTINGS_MODULE` and call `django.setup()` (via a bootstrap helper) before any thread pool creation or model access.
 
+## 2.7 Django ORM consumption patterns (etl-database-schema)
+
+- Two allowed patterns; choose explicitly per module and document it in the module README:
+  1) **Optional ORM (best-effort import, no auto-bootstrap)** — Use a helper (as in file_processing monitoring repository) that tries to import `etl_database_schema` models inside a `try/except` and returns `None` if Django is not configured. The repository must then fall back to SQL-only behavior. Do not call `django.setup()` implicitly.
+  2) **Required ORM (explicit bootstrap)** — If the module must use ORM, require `DJANGO_SETTINGS_MODULE` and call `django.setup()` via a bootstrap helper before any model access (as in reporting_seeder). Fail fast with a clear error if settings are missing.
+- Never mix the two within one module. If ORM is required, do not rely on optional imports; if ORM is optional, do not hard-depend on Django availability.
+- Always gate ORM use behind explicit configuration/flags so jobs running in k8s without Django settings continue to work when ORM is optional.
+
+## 2.8 Environment variable sourcing (local vs k8s)
+
+- Local/CLI: rely on `etl_core.cli.main_for_package()` to load `<package>/.env`; do not bake env defaults elsewhere.
+- Kubernetes: inject env via `envFrom` ConfigMap/Secret; avoid inline secrets in manifests. Keep the same variable names used in `.env` to maintain parity across modules.
+- For modules with optional ORM paths, ensure the pod can run without Django-specific env when the ORM is not enabled. For modules with required ORM, surface missing `DJANGO_SETTINGS_MODULE`/DB vars as a clear startup failure.
+
 ## 2.4 Testing
 
 - Use **unittest.TestCase** for all tests.

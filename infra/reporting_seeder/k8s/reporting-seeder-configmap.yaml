@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reporting-seeder-config
+  namespace: reporting-seeder
+  labels:
+    app: reporting-seeder
+    part-of: reporting-seeder
+
+data:
+  DB_HOST: host.docker.internal
+  DB_PORT: "5432"
+  DB_NAME: postgres
+  DB_USER: postgres
+  ENVIRONMENT: production
+  SEEDER_MAX_WORKERS: "8"
+  SEEDER_MAX_FAILURES: "5"
+  SEEDER_RESET_SECONDS: "300"
+  SEEDER_REFRESH_CONCURRENTLY: "true"

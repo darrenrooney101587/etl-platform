@@ -121,3 +121,14 @@ a
 - Module scaffolding: every new `packages/<module>/` must include `pyproject.toml`, `poetry.lock`, and package sources at the package root (no `src/` layout). Do not add cross-module imports beyond `etl_core`.
 - Jobs/processors/repos still apply: jobs orchestrate, processors hold business logic, repositories hold SQL. Infra additions must not move domain SQL into `etl_core`.
 - Put reusable, domain-agnostic utilities (e.g., circuit breakers, generic executors, shared config loaders) in `etl_core/support`. Keep domain-specific configs (like `SeederConfig`) in the owning package.
+
+## ORM consumption alignment (etl-database-schema)
+- Two allowed patterns; agents must choose per module and enforce consistently:
+  1) Optional ORM: wrap `etl_database_schema` imports in `try/except` and fall back to SQL if Django is not configured (no implicit django.setup). Do not fail the job if Django settings are absent. This matches file_processing monitoring repository behavior.
+  2) Required ORM: demand `DJANGO_SETTINGS_MODULE` and run `django.setup()` via a bootstrap helper before model access. Fail fast with a clear error if settings/DB env are missing. This matches reporting_seeder behavior.
+- Never mix patterns inside one module. If ORM is required, do not keep silent fallbacks; if ORM is optional, do not import models at module import time.
+
+## Environment sourcing alignment
+- Local/CLI: rely on `etl_core.cli.main_for_package()` to load `<package>/.env` into the process without overriding existing env vars.
+- Kubernetes: require env injection via ConfigMap/Secret (`envFrom`), not inline secrets. Keep variable names aligned with `.env` for parity across modules.
+- Agents should update manifests to remove inline secrets and prefer ConfigMap/Secret, and ensure optional-ORM modules can run without Django-specific env when ORM is disabled.

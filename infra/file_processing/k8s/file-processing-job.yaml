@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: file-processing-run-once
+  namespace: file-processing
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        job: file-processing-run
+    spec:
+      serviceAccountName: file-processing
+      restartPolicy: Never
+      containers:
+        - name: file-processing
+          image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/file-processing:latest
+          command:
+            - python
+            - -m
+            - file_processing.cli.main
+            - run
+            - hello_world
+          envFrom:
+            - configMapRef:
+                name: file-processing-config
+            - secretRef:
+                name: file-processing-secret
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: "file_processing.settings"
+            - name: PORT
+              value: "8080"
+          # No probes for job
