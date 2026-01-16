@@ -12,6 +12,8 @@ from reporting_seeder.repositories.release_snapshots import (
     ReleaseSnapshotRepository,
 )
 
+ZERO_BASE_DELTA_PCT = 100.0
+
 
 class ReleaseSnapshotProcessor:
     """Capture release snapshots for materialized views."""
@@ -49,8 +51,6 @@ class ReleaseSnapshotProcessor:
         start_time = time.monotonic()
         table_name = str(manifest["table_name"])
         released_at = released_at or datetime.now(timezone.utc)
-        executed_at: datetime
-
         try:
             columns = self._snapshots.get_columns(table_name)
             schema_hash = build_schema_hash(columns)
@@ -383,7 +383,7 @@ def _calculate_delta_pct(base_value: int, compare_value: int) -> float:
     :rtype: float
     """
     if base_value == 0:
-        return 0.0 if compare_value == 0 else 100.0
+        return 0.0 if compare_value == 0 else ZERO_BASE_DELTA_PCT
     return (compare_value - base_value) / base_value * 100.0
 
 

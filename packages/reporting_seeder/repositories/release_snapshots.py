@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -10,6 +11,8 @@ from etl_core.database.client import DatabaseClient
 ColumnDefinition = Dict[str, str]
 ColumnStat = Dict[str, Any]
 TopValueStat = Dict[str, Any]
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class ReleaseSnapshotRepository:
@@ -245,8 +248,11 @@ def _split_table_name(table_name: str) -> Tuple[str, str]:
     """
     parts = [part for part in table_name.split(".") if part]
     if len(parts) == 1:
+        _validate_identifier(parts[0])
         return "public", parts[0]
     if len(parts) == 2:
+        _validate_identifier(parts[0])
+        _validate_identifier(parts[1])
         return parts[0], parts[1]
     raise ValueError(f"Invalid table name: {table_name}")
 
@@ -259,6 +265,7 @@ def _quote_identifier(identifier: str) -> str:
     :returns: Quoted identifier string.
     :rtype: str
     """
+    _validate_identifier(identifier)
     return f"\"{identifier.replace('\"', '\"\"')}\""
 
 
@@ -348,6 +355,17 @@ def _should_collect_top_values(
     if not _is_text_type(column_type):
         return False
     return distinct_count <= max_distinct
+
+
+def _validate_identifier(identifier: str) -> None:
+    """Validate that an identifier is composed of safe characters.
+
+    :param identifier: Identifier to validate.
+    :type identifier: str
+    :raises ValueError: When the identifier contains unsupported characters.
+    """
+    if not _IDENTIFIER_RE.match(identifier):
+        raise ValueError(f"Unsafe identifier: {identifier}")
 
 
 def _coerce_json_value(value: Any) -> Any:

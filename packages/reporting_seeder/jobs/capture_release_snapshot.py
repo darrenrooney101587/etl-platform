@@ -51,7 +51,7 @@ def entrypoint(argv: List[str]) -> int:
 
     try:
         bootstrap_django(settings_module)
-    except Exception:
+    except RuntimeError:
         logger.exception("Failed to bootstrap Django using %s", settings_module)
         raise
 
