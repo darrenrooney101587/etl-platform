@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+  namespace: airflow
+  labels:
+    app: airflow
+    component: webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow
+      component: webserver
+  template:
+    metadata:
+      labels:
+        app: airflow
+        component: webserver
+    spec:
+      initContainers:
+        # DAG sync init container - runs before webserver starts
+        - name: dag-sync
+          image: etl-airflow-control-plane:latest
+          imagePullPolicy: IfNotPresent
+          command: ["airflow-control-plane", "sync"]
+          envFrom:
+            - configMapRef:
+                name: airflow-control-plane-config
+          volumeMounts:
+            - name: dags
+              mountPath: /opt/airflow/dags
+      containers:
+        - name: airflow-webserver
+          image: apache/airflow:2.8.0-python3.10
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: airflow-control-plane-config
+            - secretRef:
+                name: airflow-control-plane-secret
+          volumeMounts:
+            - name: dags
+              mountPath: /opt/airflow/dags
+          command: ["airflow"]
+          args: ["webserver"]
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: dags
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver
+  namespace: airflow
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: airflow
+    component: webserver
