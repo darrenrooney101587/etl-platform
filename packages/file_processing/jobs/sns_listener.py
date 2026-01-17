@@ -21,14 +21,13 @@ import json
 import logging
 import os
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from urllib.request import urlopen
-import time
 
 from etl_core.support.circuit_breaker import CircuitBreaker
-
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +63,7 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # health endpoints
         # Admin endpoint to inspect/reset circuit breaker (dev only)
         if self.path == "/breaker":
-            server = getattr(self, 'server', None)
+            server = getattr(self, "server", None)
             circuit_breaker = getattr(server, "circuit_breaker", None)
             if circuit_breaker is None:
                 self._send_json_response(404, {"error": "no circuit breaker"})
@@ -74,7 +73,9 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
             cooldown_remaining = None
             if last is not None:
                 try:
-                    cooldown_remaining = max(0, circuit_breaker.cooldown_seconds - (time.time() - last))
+                    cooldown_remaining = max(
+                        0, circuit_breaker.cooldown_seconds - (time.time() - last)
+                    )
                 except Exception:
                     cooldown_remaining = None
 
@@ -88,7 +89,7 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/breaker/reset":
-            server = getattr(self, 'server', None)
+            server = getattr(self, "server", None)
             circuit_breaker = getattr(server, "circuit_breaker", None)
             if circuit_breaker is None:
                 self._send_json_response(404, {"error": "no circuit breaker"})
@@ -122,7 +123,7 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/breaker":
-            server = getattr(self, 'server', None)
+            server = getattr(self, "server", None)
             circuit_breaker = getattr(server, "circuit_breaker", None)
             if circuit_breaker is None:
                 self.send_response(404)
@@ -188,8 +189,14 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
                 decoded_message = message_field
 
             # Validate that decoded_message is a dict containing 'Records'
-            if not isinstance(decoded_message, dict) or "Records" not in decoded_message:
-                logger.error("Decoded SNS Message does not contain 'Records': %s", type(decoded_message))
+            if (
+                not isinstance(decoded_message, dict)
+                or "Records" not in decoded_message
+            ):
+                logger.error(
+                    "Decoded SNS Message does not contain 'Records': %s",
+                    type(decoded_message),
+                )
                 self._send_json_response(400, {"error": "message missing Records"})
                 return
 
@@ -199,18 +206,21 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
             event_json_str = json.dumps(decoded_message)
             try:
                 # Attach executor to the HTTPServer instance in main(); use it if present.
-                server = getattr(self, 'server', None)
+                server = getattr(self, "server", None)
                 executor = getattr(server, "executor", None)
                 if executor is not None:
                     # Generate a short trace ID
                     import uuid
+
                     trace_id = str(uuid.uuid4())[:8]
 
                     # Check circuit breaker before submitting the job
                     circuit_breaker = getattr(server, "circuit_breaker", None)
                     if circuit_breaker is not None and not circuit_breaker.allow():
                         logger.warning("Circuit breaker active; skipping message")
-                        self._send_json_response(200, {"status": "skipped", "reason": "circuit_breaker_active"})
+                        self._send_json_response(
+                            200, {"status": "skipped", "reason": "circuit_breaker_active"}
+                        )
                         return
 
                     executor.submit(self._run_job, event_json_str, trace_id)
@@ -218,8 +228,13 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
                     # Fallback to daemon thread if executor not set (very unlikely)
                     import threading as _threading
                     import uuid
+
                     trace_id = str(uuid.uuid4())[:8]
-                    _threading.Thread(target=self._run_job, args=(event_json_str, trace_id), daemon=True).start()
+                    _threading.Thread(
+                        target=self._run_job,
+                        args=(event_json_str, trace_id),
+                        daemon=True,
+                    ).start()
 
                 self._send_json_response(200, {"status": "accepted"})
             except Exception:
@@ -237,13 +252,17 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
             self._send_json_response(400, {"error": "missing SubscribeURL"})
             return
 
-        logger.info("Received SubscriptionConfirmation. Visiting SubscribeURL: %s", subscribe_url)
+        logger.info(
+            "Received SubscriptionConfirmation. Visiting SubscribeURL: %s", subscribe_url
+        )
         try:
             with urlopen(subscribe_url) as response:
                 status = getattr(response, "status", None)
                 if status is None:
                     # older Python urllib may not expose status; treat as success if no exception
-                    logger.info("Subscription confirmation request completed (no status available)")
+                    logger.info(
+                        "Subscription confirmation request completed (no status available)"
+                    )
                 elif status == 200:
                     logger.info("Subscription confirmed successfully.")
                 else:
@@ -259,11 +278,13 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
         We pass the event JSON as the value for --event-json. The job's entrypoint
         is expected to accept the same CLI flag used interactively.
         """
-        circuit_breaker = getattr(self, 'server', None)
+        circuit_breaker = getattr(self, "server", None)
         circuit_breaker = getattr(circuit_breaker, "circuit_breaker", None)
         try:
             # Import the job entrypoint at runtime to avoid import-time Django/ORM
-            from file_processing.jobs.s3_data_quality_job import entrypoint  # type: ignore
+            from file_processing.jobs.s3_data_quality_job import (
+                entrypoint,
+            )  # type: ignore
 
             argv = ["--event-json", event_json]
             if trace_id:
@@ -272,7 +293,11 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
             logger.info("[%s] Starting s3_data_quality_job for SNS message", trace_id)
             ret = entrypoint(argv)
             if ret != 0:
-                logger.error("[%s] s3_data_quality_job returned non-zero exit code: %s", trace_id, ret)
+                logger.error(
+                    "[%s] s3_data_quality_job returned non-zero exit code: %s",
+                    trace_id,
+                    ret,
+                )
                 if circuit_breaker is not None:
                     circuit_breaker.record_failure()
             else:
@@ -281,7 +306,9 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
                     circuit_breaker.record_success()
         except SystemExit as e:
             # entrypoint may call sys.exit(); log and continue
-            logger.error("[%s] s3_data_quality_job exited with SystemExit: %s", trace_id, e)
+            logger.error(
+                "[%s] s3_data_quality_job exited with SystemExit: %s", trace_id, e
+            )
             if circuit_breaker is not None:
                 circuit_breaker.record_failure()
         except Exception:
@@ -290,59 +317,86 @@ class SNSRequestHandler(BaseHTTPRequestHandler):
                 circuit_breaker.record_failure()
 
 
-def main() -> None:
+def entrypoint(argv: List[str]) -> int:
+    """Start the SNS HTTP listener.
+
+    Args:
+        argv: Command line arguments (passed to the job, though sns_main
+              mostly relies on environment variables).
+
+    Returns:
+        Exit code (SNS main runs forever until interrupted).
+    """
     # Bootstrap Django early so that importing etl_database_schema models works
     # inside worker threads or repository modules. Allow DJANGO_SETTINGS_MODULE to
     # be configured via env (preferred) otherwise default to package settings.
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "file_processing.settings"))
+    os.environ.setdefault(
+        "DJANGO_SETTINGS_MODULE",
+        os.getenv("DJANGO_SETTINGS_MODULE", "file_processing.settings"),
+    )
     try:
         # Deferred import so Django is only required at runtime when running the server.
         import django  # type: ignore
+
         django.setup()
     except Exception:
         # If Django isn't installed or bootstrap fails, we want the server to fail
         # loudly during startup rather than crash unpredictably on the first job.
-        logger.exception("Failed to bootstrap Django. Ensure DJANGO_SETTINGS_MODULE and DB env are set.")
-        raise
+        logger.exception(
+            "Failed to bootstrap Django. Ensure DJANGO_SETTINGS_MODULE and DB env are set."
+        )
+        return 1
 
     port = int(os.getenv("PORT", "8080"))
     server_address = ("", port)
-    httpd = HTTPServer(server_address, SNSRequestHandler)
+    # Ignoring type error for now because HTTPServer expects Type[BaseRequestHandler] but
+    # BaseHTTPRequestHandler doesn't perfectly align with that in complex inheritance.
+    # In practice this works fine.
+    httpd = HTTPServer(server_address, SNSRequestHandler) # type: ignore
 
     # Configure a bounded thread pool for background job processing. Default to 10 workers.
     try:
         max_workers = int(os.getenv("SNS_WORKER_MAX", "10"))
     except Exception:
         max_workers = 10
-    httpd.executor = ThreadPoolExecutor(max_workers=max_workers)
+    httpd.executor = ThreadPoolExecutor(max_workers=max_workers)  # type: ignore
 
     # Configure circuit breaker parameters
     try:
-        circuit_breaker_max_failures = int(os.getenv("CIRCUIT_BREAKER_MAX_FAILURES", "5"))
-        circuit_breaker_cooldown_seconds = int(os.getenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", "60"))
+        circuit_breaker_max_failures = int(
+            os.getenv("CIRCUIT_BREAKER_MAX_FAILURES", "5")
+        )
+        circuit_breaker_cooldown_seconds = int(
+            os.getenv("CIRCUIT_BREAKER_COOLDOWN_SECONDS", "60")
+        )
     except Exception:
         circuit_breaker_max_failures = 5
         circuit_breaker_cooldown_seconds = 60
 
     # Attach a CircuitBreaker instance to the server
-    httpd.circuit_breaker = CircuitBreaker(
+    httpd.circuit_breaker = CircuitBreaker(  # type: ignore
         max_failures=int(os.getenv("CIRCUIT_MAX_FAILURES", "5")),
         reset_seconds=int(os.getenv("CIRCUIT_COOLDOWN_SECONDS", "300")),
     )
 
     logging.basicConfig(level=logging.INFO)
-    logger.info("Starting SNS listener on port %s with max_workers=%d...", port, max_workers)
+    logger.info(
+        "Starting SNS listener on port %s with max_workers=%d...", port, max_workers
+    )
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         logger.info("Stopping SNS listener.")
         # Shutdown executor to stop accepting new tasks and attempt graceful shutdown
         try:
-            httpd.executor.shutdown(wait=False)
+            httpd.executor.shutdown(wait=False)  # type: ignore
         except Exception:
             logger.exception("Failed to shutdown executor cleanly")
         httpd.server_close()
+    except Exception:
+        logger.exception("SNS listener crashed")
+        return 1
+    return 0
 
 
-if __name__ == "__main__":
-    main()
+JOB = (entrypoint, "Start the SNS HTTP listener service")

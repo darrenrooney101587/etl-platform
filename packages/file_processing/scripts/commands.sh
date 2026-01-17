@@ -1,16 +1,27 @@
 #!/usr/bin/env bash
-./packages/file_processing/scripts/build.sh
-NETWORK=local_default
+set -euo pipefail
 
-docker run -d \
-  --name file-processing-listener \
+# Build the image first
+./packages/file_processing/scripts/build.sh
+
+NETWORK=${NETWORK:-local_default}
+JOB_NAME=${1:-sns_listener}
+
+# Check if arguments were provided (so we can shift $1 safely)
+if [ "$#" -ge 1 ]; then
+    shift
+fi
+
+# Run the job in a disposable container (one-shot)
+docker run --rm \
+  --name file-processing-"$JOB_NAME" \
   --network "$NETWORK" \
   -v "$PWD":/app -w /app \
   --env-file packages/file_processing/.env \
   -e PYTHONPATH=/app/packages \
-  --entrypoint python \
   etl-file-processing \
-  -m file_processing.cli.sns_main
+  python -m file_processing.cli.main run "$JOB_NAME" "$@"
+
 
 
 TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:file-processing-topic

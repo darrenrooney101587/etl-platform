@@ -4,7 +4,7 @@ import unittest
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-from file_processing.cli.sns_main import SNSRequestHandler
+from file_processing.jobs.sns_listener import SNSRequestHandler
 
 
 class MockRequest(BytesIO):
@@ -26,7 +26,7 @@ class MockServer:
 class SnsCliTest(unittest.TestCase):
     """Test SNS request handler."""
 
-    @patch("file_processing.cli.sns_main.urlopen")
+    @patch("file_processing.jobs.sns_listener.urlopen")
     def test_do_POST_subscription(self, mock_urlopen: MagicMock) -> None:
         """Test POST with SubscriptionConfirmation."""
         mock_response = MagicMock()
@@ -57,9 +57,8 @@ class SnsCliTest(unittest.TestCase):
         mock_urlopen.assert_called_with("http://example.com/confirm")
         req.send_response.assert_called_with(200)
 
-    @patch("file_processing.cli.sns_main.entrypoint")
-    @patch("file_processing.cli.sns_main.threading.Thread")
-    def test_do_POST_notification(self, mock_thread: MagicMock, mock_entrypoint: MagicMock) -> None:
+    @patch("file_processing.jobs.sns_listener.threading.Thread")
+    def test_do_POST_notification(self, mock_thread: MagicMock) -> None:
         """Test POST with Notification."""
         handler = SNSRequestHandler
 
