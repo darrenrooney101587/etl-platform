@@ -2,7 +2,30 @@
 
 This package contains the file processing components for the ETL platform: the SNS listener, the S3 data quality job, processors, repositories, and tests.
 
-## Jobs
+## Features
+
+- **Data Quality Validation**: Validates S3 files against schemas with completeness, uniqueness, bounds, and format checks
+- **Data Profiling**: Generates statistical summaries and distributions for data analysis
+- **PDF Report Generation**: Renders data quality reports as PDF using headless browser (Playwright)
+- **Email Notifications**: Sends PDF reports via email using SendGrid SMTP
+- **SNS Integration**: HTTP listener for AWS SNS notifications
+
+For detailed information about PDF generation and email features, see [PDF_EMAIL_README.md](./PDF_EMAIL_README.md).
+
+## SNS listener runtime behavior
+
+The SNS HTTP listener (`packages/file_processing/cli/sns_main.py`) implements a small in-process HTTP server that accepts AWS SNS HTTP POST requests and forwards the inner S3 event message to the data quality job.
+
+Key behaviors:
+
+- Concurrency control: the server uses a bounded `ThreadPoolExecutor` to limit the number of concurrent job executions in a single pod. Configure with the environment variable `SNS_WORKER_MAX` (default: `10`).
+
+- Circuit breaker: to avoid repeated failing work consuming resources and spamming logs, the server includes a per-pod `CircuitBreaker`.
+  - Env vars:
+    - `CIRCUIT_BREAKER_MAX_FAILURES` (default `5`) — consecutive failing jobs before the breaker activates.
+    - `CIRCUIT_BREAKER_COOLDOWN_SECONDS` (default `60`) — how long to wait before the breaker auto-resets.
+  - While active the handler will skip submitting new jobs and respond with `{"status": "skipped"}`. You can change this behavior to return a 5xx if you prefer SNS to retry automatically.
+  - The circuit breaker is per-pod (in-memory). Restarting the pod will reset the breaker.
 
 This package contains the following jobs. See their individual READMEs for runtime details and usage.
 

@@ -10,9 +10,12 @@ packages = [{ include = "file_processing" }]
 python = "^3.10"
 etl-core = { path = "../etl_core", develop = false }
 pyarrow = { version = "^14.0.0", optional = true }
+playwright = { version = "^1.40.0", optional = true }
+sendgrid = { version = "^6.11.0", optional = true }
 
 [tool.poetry.extras]
 parquet = ["pyarrow"]
+pdf-email = ["playwright", "sendgrid"]
 
 [tool.poetry.scripts]
 file-processing = "file_processing.cli.main:main"
