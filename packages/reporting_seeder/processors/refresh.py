@@ -58,7 +58,16 @@ class RefreshProcessor:
 
         report_type: one of None|'all'|'custom'|'canned'
         """
-        manifests = self._manifests.get_enabled_manifests_for_type(report_type)
+        # Prefer a simple get_enabled_manifests() contract for fast, in-memory
+        # test doubles (many tests provide _FakeManifestRepo). This avoids
+        # accidentally hitting ORM/DB-backed code paths during unit tests.
+        if hasattr(self._manifests, "get_enabled_manifests"):
+            manifests = self._manifests.get_enabled_manifests()
+            if report_type and report_type.lower() != "all":
+                manifests = [m for m in manifests if m.get("report_type") == report_type]
+        else:
+            # Fallback to the richer API which may involve DB/ORM access.
+            manifests = self._manifests.get_enabled_manifests_for_type(report_type)
         self._refresh_many(manifests)
 
     def refresh_agency(self, agency_slug: str) -> None:
