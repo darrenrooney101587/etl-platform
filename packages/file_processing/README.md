@@ -2,6 +2,16 @@
 
 This package contains the file processing components for the ETL platform: the SNS listener, the S3 data quality job, processors, repositories, and tests.
 
+## Features
+
+- **Data Quality Validation**: Validates S3 files against schemas with completeness, uniqueness, bounds, and format checks
+- **Data Profiling**: Generates statistical summaries and distributions for data analysis
+- **PDF Report Generation**: Renders data quality reports as PDF using headless browser (Playwright)
+- **Email Notifications**: Sends PDF reports via email using SendGrid SMTP
+- **SNS Integration**: HTTP listener for AWS SNS notifications
+
+For detailed information about PDF generation and email features, see [PDF_EMAIL_README.md](./PDF_EMAIL_README.md).
+
 ## SNS listener runtime behavior
 
 The SNS HTTP listener (`packages/file_processing/cli/sns_main.py`) implements a small in-process HTTP server that accepts AWS SNS HTTP POST requests and forwards the inner S3 event message to the data quality job.
