@@ -1,0 +1,187 @@
+# Airflow Helm Chart Values
+# This configuration enables S3-based DAG distribution with a sync sidecar
+
+# Airflow image configuration
+images:
+  airflow:
+    repository: apache/airflow
+    tag: "2.8.1-python3.10"
+    pullPolicy: IfNotPresent
+
+# Executor: KubernetesExecutor for running jobs as separate pods
+executor: "KubernetesExecutor"
+
+# DAG configuration
+dags:
+  # Mount DAGs from a persistent volume that the sidecar syncs to
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClassName: gp3
+    accessMode: ReadWriteMany
+
+# Environment variables for Airflow
+env:
+  - name: AIRFLOW__CORE__DAGS_FOLDER
+    value: "/opt/airflow/dags"
+  - name: AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL
+    value: "30"  # Check for new DAGs every 30 seconds
+  - name: AIRFLOW__CORE__LOAD_EXAMPLES
+    value: "False"
+  - name: AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS
+    value: "False"
+  - name: AIRFLOW__KUBERNETES__NAMESPACE
+    value: "etl-jobs"
+  - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY
+    value: "apache/airflow"
+  - name: AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG
+    value: "2.8.1-python3.10"
+  - name: AWS_DEFAULT_REGION
+    valueFrom:
+      configMapKeyRef:
+        name: airflow-config
+        key: AWS_REGION
+
+# Scheduler configuration
+scheduler:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  # S3 sync sidecar for DAG distribution
+  extraContainers:
+    - name: dag-sync
+      image: amazon/aws-cli:2.15.0
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Starting DAG sync sidecar..."
+          
+          # Validate required environment variables
+          : "${DAG_BUCKET:?DAG_BUCKET must be set}"
+          : "${ENVIRONMENT:?ENVIRONMENT must be set}"
+          : "${AWS_REGION:?AWS_REGION must be set}"
+          
+          SYNC_INTERVAL=${DAG_SYNC_INTERVAL:-30}
+          S3_PREFIX="s3://${DAG_BUCKET}/${ENVIRONMENT}"
+          LOCAL_DAG_DIR="/opt/airflow/dags"
+          
+          echo "Configuration:"
+          echo "  S3 Bucket: ${DAG_BUCKET}"
+          echo "  Environment: ${ENVIRONMENT}"
+          echo "  S3 Prefix: ${S3_PREFIX}"
+          echo "  Local DAG Dir: ${LOCAL_DAG_DIR}"
+          echo "  Sync Interval: ${SYNC_INTERVAL}s"
+          
+          # Initial sync
+          echo "Performing initial sync..."
+          aws s3 sync "${S3_PREFIX}/" "${LOCAL_DAG_DIR}/" --delete --exact-timestamps --no-progress || {
+            echo "ERROR: Initial sync failed. DAG bucket may not exist or may be empty."
+            exit 1
+          }
+          echo "Initial sync complete."
+          
+          # Continuous sync loop
+          while true; do
+            sleep "${SYNC_INTERVAL}"
+            echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - Syncing DAGs from S3..."
+            
+            # Use --dryrun first to check for changes
+            CHANGES=$(aws s3 sync "${S3_PREFIX}/" "${LOCAL_DAG_DIR}/" --delete --exact-timestamps --dryrun 2>&1 || true)
+            
+            if echo "$CHANGES" | grep -q "(dryrun)"; then
+              echo "Changes detected, performing sync..."
+              aws s3 sync "${S3_PREFIX}/" "${LOCAL_DAG_DIR}/" --delete --exact-timestamps --no-progress
+              echo "Sync complete."
+            else
+              echo "No changes detected."
+            fi
+          done
+      env:
+        - name: DAG_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: airflow-config
+              key: DAG_BUCKET
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: airflow-config
+              key: ENVIRONMENT
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: airflow-config
+              key: AWS_REGION
+        - name: DAG_SYNC_INTERVAL
+          value: "30"
+      volumeMounts:
+        - name: dags
+          mountPath: /opt/airflow/dags
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+
+# Webserver configuration
+webserver:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+
+# PostgreSQL (metadata database)
+postgresql:
+  enabled: true
+  auth:
+    username: airflow
+    password: airflow
+    database: airflow
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+# Service account with IRSA for S3 access
+serviceAccount:
+  create: true
+  name: airflow
+  annotations:
+    # Replace with actual IAM role ARN for IRSA
+    # eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/airflow-service-account-role
+
+# RBAC for KubernetesPodOperator
+rbac:
+  create: true
+  createSCCRoleBinding: false
+
+# Security context
+securityContext:
+  fsGroup: 50000
+  runAsUser: 50000
+  runAsNonRoot: true
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 50000
+  runAsUser: 50000
+  runAsNonRoot: true

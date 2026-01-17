@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: airflow
+  labels:
+    name: airflow
+    purpose: orchestration
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: etl-jobs
+  labels:
+    name: etl-jobs
+    purpose: job-execution
