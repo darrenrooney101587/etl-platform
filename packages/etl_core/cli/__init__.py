@@ -9,7 +9,8 @@ import argparse
 import sys
 from typing import Callable, Dict, Iterable, List
 
-from etl_core.jobs import JobDefinition, discover_package_jobs
+from ..jobs import JobDefinition, discover_package_jobs
+
 import importlib.util
 import os
 import logging
