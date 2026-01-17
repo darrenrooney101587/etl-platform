@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-config
+  namespace: airflow
+data:
+  ENVIRONMENT: "dev"  # Override in environment-specific overlays: dev, staging, prod
+  AWS_REGION: "us-gov-west-1"
+  DAG_BUCKET: "etl-airflow-dags-dev"  # Override per environment
