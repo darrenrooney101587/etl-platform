@@ -44,7 +44,7 @@ class EmailSenderConfig:
             default_recipient: Default recipient. Defaults to env var DEFAULT_EMAIL_RECIPIENT.
         """
         self.smtp_host = smtp_host or os.getenv("SMTP_HOST", "smtp.sendgrid.net")
-        self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_port = smtp_port if smtp_port is not None else int(os.getenv("SMTP_PORT", "587"))
         self.smtp_user = smtp_user or os.getenv("SMTP_USER", "apikey")
         self.smtp_password = smtp_password or os.getenv("SMTP_PASSWORD", "")
         self.from_address = from_address or os.getenv(
@@ -167,10 +167,13 @@ class EmailSender:
         with open(path, "rb") as f:
             file_data = f.read()
 
-        # Determine MIME type based on file extension
-        mime_type = "application/pdf" if path.suffix.lower() == ".pdf" else "application/octet-stream"
+        # Determine MIME subtype based on file extension
+        if path.suffix.lower() == ".pdf":
+            mime_subtype = "pdf"
+        else:
+            mime_subtype = "octet-stream"
 
-        attachment = MIMEApplication(file_data, _subtype=mime_type.split("/")[1])
+        attachment = MIMEApplication(file_data, _subtype=mime_subtype)
         attachment.add_header("Content-Disposition", "attachment", filename=filename)
 
         msg.attach(attachment)

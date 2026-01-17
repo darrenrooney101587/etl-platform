@@ -19,7 +19,7 @@ class PDFGeneratorConfig:
     def __init__(
         self,
         url: Optional[str] = None,
-        timeout_ms: int = 30000,
+        timeout_ms: Optional[int] = None,
         output_dir: str = "/tmp/pdf_reports",
     ) -> None:
         """Initialize PDF generator configuration.
@@ -30,7 +30,7 @@ class PDFGeneratorConfig:
             output_dir: Directory to save generated PDFs. Defaults to /tmp/pdf_reports.
         """
         self.url = url or os.getenv("PDF_REPORT_URL", "http://localhost:3000/data-quality-report")
-        self.timeout_ms = timeout_ms or int(os.getenv("PDF_REPORT_TIMEOUT_MS", "30000"))
+        self.timeout_ms = timeout_ms if timeout_ms is not None else int(os.getenv("PDF_REPORT_TIMEOUT_MS", "30000"))
         self.output_dir = output_dir
 
 
@@ -116,11 +116,11 @@ class PDFGenerator:
                 browser = playwright.chromium.launch(headless=True)
                 page = browser.new_page()
 
-                # Navigate to the URL with timeout
-                page.goto(target_url, timeout=self._config.timeout_ms)
+                # Navigate to the URL with timeout (Playwright expects timeout in milliseconds)
+                page.goto(target_url, timeout=float(self._config.timeout_ms))
 
-                # Wait for page to be fully loaded
-                page.wait_for_load_state("networkidle", timeout=self._config.timeout_ms)
+                # Wait for page to be fully loaded (Playwright expects timeout in milliseconds)
+                page.wait_for_load_state("networkidle", timeout=float(self._config.timeout_ms))
 
                 # Generate PDF with A4 format
                 page.pdf(
