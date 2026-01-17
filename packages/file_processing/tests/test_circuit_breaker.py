@@ -2,7 +2,7 @@ import time
 import logging
 import unittest
 
-from file_processing.cli.sns_main import CircuitBreaker
+from etl_core.support.circuit_breaker import CircuitBreaker
 
 
 class TestCircuitBreaker(unittest.TestCase):

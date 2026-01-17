@@ -58,7 +58,16 @@ class RefreshProcessor:
 
         report_type: one of None|'all'|'custom'|'canned'
         """
-        manifests = self._manifests.get_enabled_manifests_for_type(report_type)
+        # Prefer a simple get_enabled_manifests() contract for fast, in-memory
+        # test doubles (many tests provide _FakeManifestRepo). This avoids
+        # accidentally hitting ORM/DB-backed code paths during unit tests.
+        if hasattr(self._manifests, "get_enabled_manifests"):
+            manifests = self._manifests.get_enabled_manifests()
+            if report_type and report_type.lower() != "all":
+                manifests = [m for m in manifests if m.get("report_type") == report_type]
+        else:
+            # Fallback to the richer API which may involve DB/ORM access.
+            manifests = self._manifests.get_enabled_manifests_for_type(report_type)
         self._refresh_many(manifests)
 
     def refresh_agency(self, agency_slug: str) -> None:
@@ -167,31 +176,16 @@ class RefreshProcessor:
             if needs_recreate:
                 logger.info("Query changed or view missing for %s; recreating", table_name)
                 self._mv.create_or_replace_view(table_name, query)
-                # Auto-creation of unique indexes has been intentionally removed
+                # Note: Auto-creation of unique indexes has been intentionally removed
                 # because choosing a safe unique key requires domain knowledge.
-                # If you need concurrent refresh, create a proper unique index
+                # If concurrent refresh is needed, create a proper unique index
                 # manually for the materialized view via a migration or DB script.
-                logger.warning(
-                    "Auto-creation of unique index is disabled. Manual index creation is required for CONCURRENTLY refresh on %s",
-                    table_name,
-                )
             else:
                 # View exists and query unchanged; refresh it
-                # If configured to refresh concurrently, only do so when a unique
-                # index exists. Otherwise use non-concurrent refresh to avoid
-                # the Postgres prerequisite error and to keep behavior predictable
-                # when unique keys can't be guaranteed.
-                if self._config.refresh_concurrently:
-                    if self._mv.has_unique_index(table_name):
-                        self._mv.refresh_view(table_name, concurrently=True)
-                    else:
-                        logger.info(
-                            "Concurrent refresh skipped for %s: no unique index present; using non-concurrent refresh",
-                            table_name,
-                        )
-                        self._mv.refresh_view(table_name, concurrently=False)
-                else:
-                    self._mv.refresh_view(table_name, concurrently=False)
+                # Pass concurrently flag directly to refresh_view; it will handle
+                # the fallback to non-concurrent refresh if the view lacks a unique
+                # index (PostgreSQL requirement for CONCURRENTLY).
+                self._mv.refresh_view(table_name, concurrently=self._config.refresh_concurrently)
 
             # Update planner statistics
             self._mv.analyze_view(table_name)

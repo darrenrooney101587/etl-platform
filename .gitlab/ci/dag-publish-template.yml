@@ -1,0 +1,77 @@
+# GitLab CI Template for Airflow DAG Publishing
+# Include this in package-specific .gitlab-ci.yml files
+
+.dag_publish_template:
+  stage: deploy
+  image: python:3.10-slim
+  variables:
+    POETRY_VERSION: "2.1.1"
+    POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  before_script:
+    - apt-get update && apt-get install -y git
+    - python -m pip install -U pip "poetry==${POETRY_VERSION}"
+    # Install airflow-dag-publisher
+    - cd packages/airflow_dag_publisher
+    - poetry config virtualenvs.create false
+    - poetry install --no-interaction --no-ansi
+    - cd ../..
+  script:
+    # Required environment variables:
+    # - ENVIRONMENT: dev, staging, or prod
+    # - PACKAGE_NAME: Name of the package (e.g., data_pipeline)
+    # - IMAGE_TAG: Full container image URI with tag
+    # - DAG_BUCKET: S3 bucket name for DAGs
+    # - AWS_ACCESS_KEY_ID: AWS credentials (from CI secrets)
+    # - AWS_SECRET_ACCESS_KEY: AWS credentials (from CI secrets)
+    
+    # Validate required variables
+    - |
+      if [ -z "$ENVIRONMENT" ]; then
+        echo "ERROR: ENVIRONMENT is not set"
+        exit 1
+      fi
+      if [ -z "$PACKAGE_NAME" ]; then
+        echo "ERROR: PACKAGE_NAME is not set"
+        exit 1
+      fi
+      if [ -z "$IMAGE_TAG" ]; then
+        echo "ERROR: IMAGE_TAG is not set"
+        exit 1
+      fi
+      if [ -z "$DAG_BUCKET" ]; then
+        echo "ERROR: DAG_BUCKET is not set"
+        exit 1
+      fi
+    
+    # Publish DAGs to S3
+    - |
+      echo "Publishing DAGs for ${PACKAGE_NAME} to ${ENVIRONMENT}"
+      airflow-dag-publisher publish \
+        --bucket "${DAG_BUCKET}" \
+        --environment "${ENVIRONMENT}" \
+        --package-name "${PACKAGE_NAME}" \
+        --dag-path "packages/${PACKAGE_NAME}/airflow_dags" \
+        --aws-region "${AWS_REGION:-us-gov-west-1}"
+    
+    # Verify published DAGs
+    - |
+      echo "Verifying published DAGs:"
+      airflow-dag-publisher list \
+        --bucket "${DAG_BUCKET}" \
+        --environment "${ENVIRONMENT}" \
+        --package-name "${PACKAGE_NAME}" \
+        --aws-region "${AWS_REGION:-us-gov-west-1}"
+  
+  only:
+    - main
+    - staging
+    - production
+  
+  # Run only when DAG files change or on manual trigger
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - packages/${PACKAGE_NAME}/airflow_dags/**/*.py
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: manual
+      allow_failure: false

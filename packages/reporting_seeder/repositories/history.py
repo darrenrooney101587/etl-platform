@@ -1,9 +1,9 @@
 """Repository for recording refresh history and metrics using Django ORM.
 
 This implementation uses the upstream models from
-`etl_database_schema.apps.bms_reporting.models` and performs ORM operations.
-Django must be configured (set DJANGO_SETTINGS_MODULE and call django.setup())
-before instantiating or using this repository.
+`etl_database_schema.apps.bms_reporting.models` (or other layout variants)
+and performs ORM operations. Django must be configured (set DJANGO_SETTINGS_MODULE
+and call django.setup()) before instantiating or using this repository.
 """
 
 from __future__ import annotations
@@ -39,18 +39,30 @@ class HistoryRepository:
             RuntimeError: if Django or the models are not available. The
             message explains how to bootstrap Django for callers.
         """
-        try:
-            from etl_database_schema.apps.bms_reporting.models import (
-                SeederRunHistory,
-                SeederJobStatus,
-            )
-            return SeederRunHistory, SeederJobStatus
-        except Exception as exc:  # pragma: no cover - runtime dependency
-            # Provide a clear error directing callers to bootstrap Django.
-            raise RuntimeError(
-                "Django ORM models are not available. Ensure DJANGO_SETTINGS_MODULE is set "
-                "and that reporting_seeder.django_bootstrap.bootstrap_django(...) has been called before using HistoryRepository."
-            ) from exc
+        # Try a few known import paths to support different etl_database_schema layouts
+        candidates = (
+            "etl_database_schema.apps.bms_reporting.models",
+            "etl_database_schema.apps.reporting.models",
+            "etl_database_schema.apps.bms.models",
+        )
+        last_exc: Exception | None = None
+        for mod_path in candidates:
+            try:
+                module = __import__(mod_path, fromlist=["*"])
+                # Models may live in the imported module directly
+                SeederRunHistory = getattr(module, "SeederRunHistory", None)
+                SeederJobStatus = getattr(module, "SeederJobStatus", None)
+                if SeederRunHistory is not None and SeederJobStatus is not None:
+                    return SeederRunHistory, SeederJobStatus
+            except Exception as exc:  # pragma: no cover - runtime dependency
+                last_exc = exc
+                continue
+
+        # If we didn't find models, raise a helpful error directing callers to bootstrap Django
+        raise RuntimeError(
+            "Django ORM models are not available. Ensure DJANGO_SETTINGS_MODULE is set "
+            "and that reporting_seeder.django_bootstrap.bootstrap_django(...) has been called before using HistoryRepository."
+        ) from last_exc
 
     def record_start(self, run_id: str, manifest: Dict[str, object]) -> None:
         SeederRunHistory, SeederJobStatus = self._ensure_models()
