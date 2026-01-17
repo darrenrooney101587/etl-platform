@@ -57,6 +57,7 @@ def discover_package_jobs(package_name: str) -> Dict[str, JobDefinition]:
     # Iterate over all modules in the jobs package
     for module_info in pkgutil.iter_modules(jobs_package.__path__):
         # Handle both tuple format (finder, name, ispkg) and ModuleInfo object
+        # for backwards compatibility with different Python versions/environments
         if isinstance(module_info, tuple):
             _, module_name, is_pkg = module_info
         else:

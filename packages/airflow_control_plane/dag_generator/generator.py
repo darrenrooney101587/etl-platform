@@ -68,15 +68,18 @@ def run_job(**context):
     entrypoint, description = JOB
     
     # Get any arguments from Airflow config or context
-    job_args = context.get('dag_run').conf.get('args', []) if context.get('dag_run') else []
+    dag_run = context.get('dag_run')
+    job_args = []
+    if dag_run and dag_run.conf:
+        job_args = dag_run.conf.get('args', [])
     
     try:
         exit_code = entrypoint(job_args)
         if exit_code != 0:
-            raise RuntimeError(f"Job exited with code {{exit_code}}")
+            raise RuntimeError(f"Job exited with code {{{{exit_code}}}}")
         logger.info("Job completed successfully")
     except Exception as e:
-        logger.error(f"Job failed: {{e}}")
+        logger.error(f"Job failed: {{{{e}}}}")
         raise
 
 
