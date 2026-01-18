@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Platform monitoring and health signals"
 authors = ["Admin <admin@example.com>"]
 readme = "README.md"
-packages = [{ include = "observability" }]
+packages = [{ include = "observability", from = ".." }]
 
 [tool.poetry.dependencies]
 python = "^3.10"

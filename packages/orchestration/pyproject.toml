@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Utilities for generating and publishing Airflow DAGs to S3"
 authors = ["ETL Platform Team"]
 readme = "README.md"
-packages = [{include = "orchestration"}]
+packages = [{include = "orchestration", from = ".."}]
 
 [tool.poetry.dependencies]
 python = "^3.10"

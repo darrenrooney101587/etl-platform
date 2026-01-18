@@ -1,4 +1,4 @@
-.local/
+#.local/
 *.tfstate
 *.tfstate.*
 *.tfstate.backup

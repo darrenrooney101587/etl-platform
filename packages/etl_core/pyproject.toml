@@ -4,10 +4,10 @@ version = "0.1.0"
 description = "Pure Python shared utilities for ETL runtimes"
 authors = ["Admin <admin@example.com>"]
 readme = "README.md"
+packages = [{ include = "etl_core", from = ".." }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-# Core ETL runtime dependencies used by S3/FTPS utilities
 boto3 = "^1.26"
 psycopg2-binary = "^2.9"
 
