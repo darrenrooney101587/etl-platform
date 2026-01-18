@@ -5,9 +5,8 @@ The top-level README is intentionally high-level — each module (and infra stac
 
 Quick links
 - packages/: module source and package-level README files
-- infra/: infrastructure stacks and per-module deployment guides
+- infra/: infrastructure stacks and per-module deployment guides (see `infra/README.md`)
 - docs/airflow/: Airflow-specific deployment and operational docs
-- AIRFLOW_CONTROL_PLANE_SUMMARY.md: detailed control-plane design and implementation notes
 
 Modules
 

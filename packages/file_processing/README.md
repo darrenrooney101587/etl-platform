@@ -10,7 +10,63 @@ This package contains the file processing components for the ETL platform: the S
 - **Email Notifications**: Sends PDF reports via email using SendGrid SMTP
 - **SNS Integration**: HTTP listener for AWS SNS notifications
 
-For detailed information about PDF generation and email features, see [PDF_EMAIL_README.md](./PDF_EMAIL_README.md).
+## PDF Report Generation and Email Notifications
+
+The package includes optional PDF generation and email notification capabilities. After successful data quality validation, the system can:
+
+1. Generate a PDF report using headless Chromium (via Playwright)
+2. Send the PDF report to configured recipients via SendGrid SMTP
+
+### Components
+
+- **PDFGenerator** (`processors/pdf_generator.py`): Uses Playwright to render frontend pages as PDF with 100% visual fidelity
+- **EmailSender** (`processors/email_sender.py`): Sends emails with PDF attachments via SendGrid SMTP
+
+### Configuration
+
+Add these environment variables to your `.env` file:
+
+```bash
+# SendGrid / Email Configuration
+SENDGRID_API_KEY=your-sendgrid-api-key
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey
+SMTP_PASSWORD=your-sendgrid-api-key
+DEFAULT_EMAIL_RECIPIENT=admin@example.com
+EMAIL_FROM_ADDRESS=noreply@etl-platform.example.com
+EMAIL_FROM_NAME=ETL Platform Data Quality
+
+# PDF Report Configuration
+PDF_REPORT_URL=http://localhost:3000/data-quality-report
+PDF_REPORT_TIMEOUT_MS=30000
+```
+
+### Installation
+
+Install with PDF/email extras:
+
+```bash
+cd packages/file_processing
+poetry install --extras pdf-email
+playwright install chromium
+```
+
+### Usage
+
+Use the `s3_data_quality_with_pdf_email_job` job to enable PDF and email features:
+
+```bash
+file-processing s3_data_quality_with_pdf_email_job \
+    --event-json '{"bucket": "my-bucket", "key": "path/to/file.csv"}' \
+    --email-recipients "user1@example.com,user2@example.com"
+```
+
+Options:
+- `--skip-pdf`: Skip PDF generation and email sending
+- `--email-recipients`: Comma-separated list of recipients (overrides default)
+
+PDF/email failures do not fail the data quality job; they are logged and the job continues.
 
 ## SNS listener runtime behavior
 
@@ -27,11 +83,14 @@ Key behaviors:
   - While active the handler will skip submitting new jobs and respond with `{"status": "skipped"}`. You can change this behavior to return a 5xx if you prefer SNS to retry automatically.
   - The circuit breaker is per-pod (in-memory). Restarting the pod will reset the breaker.
 
-This package contains the following jobs. See their individual READMEs for runtime details and usage.
+## Jobs
 
-- **[sns_listener](jobs/README_sns_listener.md)**: In-process HTTP server that listens for SNS notifications and triggers the data quality job.
-- **[s3_data_quality_job](jobs/README_s3_data_quality_job.md)**: Processes a single S3 file to validate data quality.
-- **[hello_world](jobs/README_hello_world.md)**: Simple smoke test job.
+This package contains the following jobs. See their individual reference docs in `jobs_docs/` for detailed runtime information:
+
+- **sns_listener** ([reference](jobs_docs/README_sns_listener.md)): In-process HTTP server that listens for SNS notifications and triggers the data quality job.
+- **s3_data_quality_job** ([reference](jobs_docs/README_s3_data_quality_job.md)): Processes a single S3 file to validate data quality.
+- **s3_data_quality_with_pdf_email_job**: Extended version of s3_data_quality_job that generates PDF reports and sends emails after successful validation.
+- **hello_world** ([reference](jobs_docs/README_hello_world.md)): Simple smoke test job.
 
 ## Testing
 
