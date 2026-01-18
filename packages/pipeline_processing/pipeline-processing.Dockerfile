@@ -21,8 +21,9 @@ COPY packages/pipeline_processing /app/packages/pipeline_processing
 # Install dependencies
 WORKDIR /app/packages/pipeline_processing
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --extras db
+    && poetry install --no-interaction --no-ansi
 
 # Entrypoint: expose the installed console script (stable for EKS Jobs)
 ENTRYPOINT ["pipeline-processing"]
 CMD ["--help"]
+

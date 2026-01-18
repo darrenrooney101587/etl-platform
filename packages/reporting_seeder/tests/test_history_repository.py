@@ -14,8 +14,8 @@ class HistoryRepositoryTests(unittest.TestCase):
         self.SeederRunHistory = MagicMock()
         self.SeederJobStatus = MagicMock()
 
-        # Create a fake etl_database_schema models module and insert into sys.modules
-        self._fake_mod_name = 'etl_database_schema.apps.reporting.models'
+        # Create a fake etl_core.models models module and insert into sys.modules
+        self._fake_mod_name = 'etl_core.models.apps.reporting.models'
         fake_mod = types.ModuleType(self._fake_mod_name)
         fake_mod.SeederRunHistory = self.SeederRunHistory
         fake_mod.SeederJobStatus = self.SeederJobStatus

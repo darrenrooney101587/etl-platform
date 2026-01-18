@@ -8,17 +8,10 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.10"
 # Local path dependencies for development convenience
-etl-core = { path = "./packages/etl_core", develop = true }
+etl-core = { path = "./packages/etl_core", develop = true, extras = ["models"] }
 pipeline-processing = { path = "./packages/pipeline_processing", develop = true }
 observability = { path = "./packages/observability", develop = true }
 boto3-stubs = "~=1.42.19"
-
-[tool.poetry.group.schema]
-optional = true
-
-[tool.poetry.group.schema.dependencies]
-# External Django ORM + migrations package (schema contract)
-etl-database-schema = { git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git", rev = "0.4.2" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4"

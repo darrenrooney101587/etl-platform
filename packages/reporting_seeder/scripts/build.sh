@@ -2,22 +2,12 @@
 # packages/reporting_seeder/scripts/build.sh
 # Build the reporting_seeder Docker image using the repo root as build context.
 #
-# Local dev (recommended): keep a checkout of etl-database-schema next to this repo at:
-#   ../etl-database-schema
-#
-# You can also pass an explicit path:
-#   ./packages/reporting_seeder/scripts/build.sh --schema-path /abs/path/to/etl-database-schema
-#
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PKG_NAME="reporting_seeder"
 IMAGE_NAME="etl-reporting-seeder"
 DOCKERFILE_PATH="$REPO_ROOT/packages/$PKG_NAME/reporting-seeder.Dockerfile"
-
-DEFAULT_SCHEMA_PATH="${REPO_ROOT}/../etl-database-schema"
-SCHEMA_PATH=""
-STAGING_DIR="${REPO_ROOT}/.local/etl-database-schema"
 
 SHOW_HELP=false
 
@@ -27,14 +17,6 @@ while [[ $# -gt 0 ]]; do
       SHOW_HELP=true
       shift
       ;;
-    --schema-path)
-      if [[ -z "${2:-}" ]]; then
-        echo "--schema-path requires an argument" >&2
-        exit 1
-      fi
-      SCHEMA_PATH="$2"
-      shift 2
-      ;;
     *)
       echo "Unknown arg: $1" >&2
       exit 1
@@ -43,40 +25,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$SHOW_HELP" == "true" ]]; then
-  echo "Usage: $0 [--schema-path /abs/path/to/etl-database-schema]"
+  echo "Usage: $0"
   echo ""
-  echo "Builds the local image '$IMAGE_NAME' after staging etl-database-schema into .local/etl-database-schema."
+  echo "Builds the local image '$IMAGE_NAME'."
   exit 0
 fi
-
-if [[ -z "$SCHEMA_PATH" ]]; then
-  SCHEMA_PATH="$DEFAULT_SCHEMA_PATH"
-fi
-
-if [[ ! -d "$SCHEMA_PATH" ]]; then
-  echo "Missing schema checkout at: $SCHEMA_PATH" >&2
-  echo "Clone it next to the repo root or pass --schema-path." >&2
-  echo "Example: git clone git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git ../etl-database-schema" >&2
-  exit 1
-fi
-
-mkdir -p "${REPO_ROOT}/.local"
-rm -rf "${STAGING_DIR}"
-
-if command -v rsync >/dev/null 2>&1; then
-  rsync -a --delete \
-    --exclude ".git" \
-    --exclude "__pycache__" \
-    --exclude ".ruff_cache" \
-    "${SCHEMA_PATH}/" "${STAGING_DIR}/"
-else
-  cp -R "$SCHEMA_PATH" "$STAGING_DIR"
-  rm -rf "${STAGING_DIR}/.git" || true
-fi
-
-echo "Staged etl-database-schema into: $STAGING_DIR"
 
 echo "Building image $IMAGE_NAME using Dockerfile: $DOCKERFILE_PATH with context: $REPO_ROOT"
 docker build -t "$IMAGE_NAME" -f "$DOCKERFILE_PATH" "$REPO_ROOT"
 
 echo "Build complete: $IMAGE_NAME"
+

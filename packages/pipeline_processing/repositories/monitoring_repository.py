@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from django import setup as django_setup
 from django.apps import apps
-from etl_database_schema.apps.bms_reporting.models import (
+from etl_core.models.apps.bms_reporting.models import (
     MonitoringFile as ORMMonitoringFile,
     MonitoringFileRun as ORMMonitoringFileRun,
     MonitoringFileDataQuality as ORMMonitoringFileDataQuality,
