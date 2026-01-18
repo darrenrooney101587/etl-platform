@@ -268,7 +268,7 @@ develop = false
 
 [package.dependencies]
 boto3 = "^1.26"
-django = "^4.2"
+django = "^4.2.26"
 psycopg2-binary = "^2.9"
 
 [package.source]
@@ -963,4 +963,4 @@ pdf-email = ["playwright", "sendgrid"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "ed2cfe0ceb960b6e1c4907126db705c768755be77d728869cf3135cf795e1bee"
+content-hash = "9f407269fadbe5e6736057db32eb06a8c6ff17cac1beb40280c63eace5825b1e"

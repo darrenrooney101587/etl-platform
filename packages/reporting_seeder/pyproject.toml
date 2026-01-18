@@ -17,7 +17,7 @@ python = "^3.10"
 etl-core = { path = "../etl_core", develop = false }
 # broaden psutil to accept versions required by upstream schema package; keep lower bound to avoid surprises
 psutil = ">=5.9,<8.0"
-django = "^4.2"
+django = "^4.2.26"
 
 [tool.poetry.scripts]
 reporting-seeder = "cli.main:main"

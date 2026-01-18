@@ -9,7 +9,7 @@ packages = [{ include = "pipeline_processing", from = ".." }]
 [tool.poetry.dependencies]
 python = "^3.10"
 etl-core = { path = "../etl_core", develop = false }
-django = "^4.2"
+django = "^4.2.26"
 psycopg2-binary = "^2.9"
 boto3 = "^1.37"
 python-json-logger = "^4.0"

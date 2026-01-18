@@ -614,14 +614,14 @@ files = [
 
 [[package]]
 name = "django"
-version = "4.2.27"
+version = "4.2.26"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "django-4.2.27-py3-none-any.whl", hash = "sha256:f393a394053713e7d213984555c5b7d3caeee78b2ccb729888a0774dff6c11a8"},
-    {file = "django-4.2.27.tar.gz", hash = "sha256:b865fbe0f4a3d1ee36594c5efa42b20db3c8bbb10dff0736face1c6e4bda5b92"},
+    {file = "django-4.2.26-py3-none-any.whl", hash = "sha256:c96e64fc3c359d051a6306871bd26243db1bd02317472a62ffdbe6c3cae14280"},
+    {file = "django-4.2.26.tar.gz", hash = "sha256:9398e487bcb55e3f142cb56d19fbd9a83e15bb03a97edc31f408361ee76d9d7a"},
 ]
 
 [package.dependencies]
@@ -645,7 +645,7 @@ develop = true
 
 [package.dependencies]
 boto3 = "^1.26"
-django = "^4.2"
+django = "^4.2.26"
 psycopg2-binary = "^2.9"
 
 [package.source]
@@ -921,7 +921,7 @@ files = []
 develop = true
 
 [package.dependencies]
-django = "4.2.27"
+django = "4.2.26"
 etl-core = {path = "../etl_core"}
 psycopg2-binary = "2.9.11"
 slack-sdk = "3.39.0"
@@ -971,7 +971,7 @@ psycopg2-binary = "^2.9"
 python-json-logger = "^4.0"
 
 [package.extras]
-db = ["django (>=4.2,<5.0)"]
+db = ["django (>=4.2.26,<5.0.0)"]
 parquet = ["pyarrow (>=14.0.0,<15.0.0)"]
 pdf-email = ["playwright (>=1.40.0,<2.0.0)", "sendgrid (>=6.11.0,<7.0.0)"]
 
