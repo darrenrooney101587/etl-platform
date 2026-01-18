@@ -153,7 +153,6 @@ class S3DataQualityProcessor:
                     parsed_key.agency_slug,
                     parsed_key.file_name,
                 )
-                # Create monitoring_file without s3_url for compatibility with test fakes
                 monitoring_file = self._repository.create_monitoring_file(
                     parsed_key.agency_slug, parsed_key.file_name
                 )
@@ -169,7 +168,6 @@ class S3DataQualityProcessor:
                 "Monitoring file is suppressed; skipping data quality processing",
                 extra={"monitoring_file_id": getattr(monitoring_file, "id", None)},
             )
-            # Return a benign successful result indicating the run was intentionally skipped.
             return DataQualityResult(
                 score=100,
                 passed=True,
@@ -615,7 +613,6 @@ class S3DataQualityProcessor:
             except Exception as exc:
                 logger.error("Failed to write dry-run output: %s", exc)
             return
-        # Upsert data quality (include monitoring_file_id for cross-run queries)
         self._repository.upsert_data_quality(
             monitoring_file_run_id=run_id,
             monitoring_file_id=monitoring_file_id,
@@ -627,7 +624,6 @@ class S3DataQualityProcessor:
             failed_validation_rules=result.failed_validation_rules,
         )
 
-        # Upsert profile if available
         if result.profile is not None:
             self._repository.upsert_data_profile(
                 monitoring_file_run_id=run_id,
@@ -635,5 +631,4 @@ class S3DataQualityProcessor:
                 profile_payload=result.profile.to_dict(),
             )
 
-        # Update monitoring file score
         self._repository.update_monitoring_file_score(monitoring_file_id, result.score)

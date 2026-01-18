@@ -12,12 +12,10 @@ resource "random_password" "db_password" {
   special          = true
   override_special = "!@#$%&*()-_=+"
   keepers = {
-    # rotate only when explicit input password changes
     input_pass = var.db_password
   }
 }
 
-# Create a minimal VPC if vpc_id isn't provided
 resource "aws_vpc" "minimal" {
   count             = var.vpc_id == "" ? 1 : 0
   cidr_block        = "10.100.0.0/16"
@@ -26,7 +24,6 @@ resource "aws_vpc" "minimal" {
   tags              = local.common_tags
 }
 
-# Create two private subnets across two AZs for RDS
 resource "aws_subnet" "private" {
   count = length(var.subnet_ids) > 0 ? 0 : (var.vpc_id == "" ? 2 : 0)
   vpc_id = aws_vpc.minimal[0].id
@@ -35,8 +32,6 @@ resource "aws_subnet" "private" {
   tags = merge(local.common_tags, { Name = "${local.name_prefix}-subnet-${count.index}" })
 }
 
-# If caller provided subnet_ids, use them. Otherwise, if we created subnets use them.
-# If a vpc_id was provided and no subnet_ids, attempt to use discovered subnets from data.aws_subnets.
 locals {
   rds_subnet_ids = length(var.subnet_ids) > 0 ? var.subnet_ids : (
     var.vpc_id == "" ? aws_subnet.private[*].id : (
@@ -45,7 +40,6 @@ locals {
   )
 }
 
-# If vpc_id is provided but no subnets provided, attempt to discover private subnets
 data "aws_availability_zones" "available" {}
 
 data "aws_subnets" "vpc_subnets" {
@@ -56,7 +50,6 @@ data "aws_subnets" "vpc_subnets" {
   }
 }
 
-# Security group allowing access from caller's IP if provided via env or 0.0.0.0/0 for convenience when public_access=true
 resource "aws_security_group" "db_sg" {
   name        = "${local.name_prefix}-sg"
   description = "Security group for on-demand postgres"
@@ -79,14 +72,12 @@ resource "aws_security_group" "db_sg" {
   }
 }
 
-# RDS subnet group
 resource "aws_db_subnet_group" "rds_subnet_group" {
   name       = "${local.name_prefix}-subnet-group"
   subnet_ids = local.rds_subnet_ids
   tags       = local.common_tags
 }
 
-# RDS instance
 resource "aws_db_instance" "postgres" {
   identifier              = local.name_prefix
   engine                  = "postgres"
@@ -106,7 +97,6 @@ resource "aws_db_instance" "postgres" {
   deletion_protection     = false
 }
 
-# Outputs
 output "db_endpoint" {
   value = aws_db_instance.postgres.address
 }

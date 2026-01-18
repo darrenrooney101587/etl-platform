@@ -128,7 +128,6 @@ def entrypoint(argv: List[str]) -> int:
         default=None,
     )
 
-    # Configure logging
     is_main_script = __name__ == "__main__" or "s3_data_quality_with_pdf_email" in str(argv)
 
     if is_main_script and not logging.getLogger().handlers:
@@ -161,16 +160,13 @@ def entrypoint(argv: List[str]) -> int:
             logger.error("Invalid JSON provided in event payload: %s", e)
             return 1
 
-        # Extract S3 events
         s3_events = _extract_s3_events(event_payload)
 
         if not s3_events:
             logger.error("No S3 events found in payload")
             return 1
 
-        # Initialize dependencies
         try:
-            # Require Django settings for ORM-backed repository access
             if not os.getenv("DJANGO_SETTINGS_MODULE"):
                 os.environ["DJANGO_SETTINGS_MODULE"] = "file_processing.settings"
             import django  # type: ignore
@@ -189,7 +185,6 @@ def entrypoint(argv: List[str]) -> int:
             logger.exception("Failed to initialize job dependencies: %s", e)
             return 1
 
-        # Configure data quality processor
         processor_config = S3DataQualityProcessorConfig(dry_run=args.dry_run)
 
         processor = S3DataQualityProcessor(

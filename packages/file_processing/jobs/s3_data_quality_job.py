@@ -28,7 +28,6 @@ def _extract_s3_events(payload: dict) -> List[S3Event]:
     """Extract S3Events from various trigger payloads (Direct, S3, SNS)."""
     events = []
 
-    # helper to process an S3-style event dict (with Records)
     def process_s3_event_payload(payload_data):
         if not isinstance(payload_data, dict):
             return []
@@ -111,7 +110,6 @@ def entrypoint(argv: List[str]) -> int:
     # When called from sns_main, we reuse the existing logger configuration.
     is_main_script = __name__ == "__main__" or "file_processing.jobs.s3_data_quality_job" in str(argv)
 
-    # Check if handlers are already configured (e.g. by sns_main)
     if is_main_script and not logging.getLogger().handlers:
         logging.basicConfig(
             level=logging.INFO,
@@ -126,7 +124,6 @@ def entrypoint(argv: List[str]) -> int:
     trace_prefix = f"[{args.trace_id}] " if args.trace_id else ""
 
     try:
-        # Parse the AWS S3 event JSON
         event_json_str = args.event_json
         if args.event_file:
             try:
@@ -142,7 +139,6 @@ def entrypoint(argv: List[str]) -> int:
             logger.error("Invalid JSON provided in event payload: %s", e)
             return 1
 
-        # Use extraction helper
         s3_events = _extract_s3_events(event_payload)
 
         if not s3_events:
@@ -151,15 +147,13 @@ def entrypoint(argv: List[str]) -> int:
             logger.error("No S3 events found in payload")
             return 1
 
-        # Initialize dependencies
         try:
-            # Require Django settings for ORM-backed repository access
             if not os.getenv("DJANGO_SETTINGS_MODULE"):
                 os.environ["DJANGO_SETTINGS_MODULE"] = "file_processing.settings"
             import django  # type: ignore
             django.setup()
 
-            db_client = DatabaseClient()  # Config from env vars
+            db_client = DatabaseClient()
             # S3Config requires bucket args even if not used by the processor which uses event.bucket
             s3_config = S3Config(
                 source_bucket=os.getenv("S3_SOURCE_BUCKET", "ignored"),
@@ -172,10 +166,8 @@ def entrypoint(argv: List[str]) -> int:
             logger.exception("Failed to initialize job dependencies: %s", e)
             return 1
 
-        # Configure processor
         processor_config = S3DataQualityProcessorConfig(
             dry_run=args.dry_run,
-            # Defaults for other config options
         )
 
         processor = S3DataQualityProcessor(

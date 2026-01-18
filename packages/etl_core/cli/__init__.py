@@ -47,7 +47,6 @@ def _load_package_env(package_name: str) -> None:
                 key, val = line.split("=", 1)
                 key = key.strip()
                 val = val.strip().strip('"').strip("'")
-                # Only set if not already present
                 if key and key not in os.environ:
                     os.environ[key] = val
     except Exception:

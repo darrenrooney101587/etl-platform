@@ -120,17 +120,14 @@ class AgencyDataJob:
         :rtype: Dict[str, Any]
         """
         try:
-            # Get agency info
             agency_s3_slug = self.db.get_agency_s3_slug(agency_id)
             folder_name = agency_s3_slug if agency_s3_slug else f"agency-{agency_id}"
 
-            # Analyze files (read-only)
             db_results = self.attachment_repo.get_attachment_files_for_s3_processing(agency_id)
             forms = [f for f in db_results if f['attachable_type'] == 'Form']
             user_docs = [f for f in db_results if f['attachable_type'] == 'UserDocument']
             total_size_mb = sum(f.get('byte_size', 0) for f in db_results) / 1024 / 1024
 
-            # Analyze employment history (read-only)
             employment_count = 0
             try:
                 employment_processor = self._create_employment_history_processor(
@@ -141,7 +138,6 @@ class AgencyDataJob:
                 employment_data = employment_processor.fetch_data()
                 employment_count = len(employment_data)
             except Exception:
-                # Ignore employment history errors during analysis, keep counts zero
                 employment_count = 0
 
             return {
@@ -177,7 +173,6 @@ class AgencyDataJob:
         :rtype: Dict[str, Any]
         """
         try:
-            # Read-only inputs
             db_results = self.attachment_repo.get_attachment_files_for_s3_processing(agency_id)
             agency_s3_slug = self.db.get_agency_s3_slug(agency_id)
 
@@ -196,28 +191,23 @@ class AgencyDataJob:
                         }
                     }
 
-                # Create processor
                 processor = self._create_s3_processor(
                     agency_id=agency_id,
                     agency_s3_slug=agency_s3_slug,
                     destination_prefix='/downloads/'
                 )
 
-                # Process files (concurrent processing enabled)
                 file_results = processor.process_files(
                     file_mappings=db_results,
                     concurrent=True
                 )
 
-                # Upload metadata CSV
                 csv_result = upload_attachment_manifest(processor, db_results)
 
-                # Process employment history
                 employment_result = self._process_employment_history(
                     agency_id, agency_s3_slug
                 )
 
-                # Summarize results
                 successful_files = [r for r in file_results if r['status'] == 'success']
                 failed_files = [r for r in file_results if r['status'] != 'success']
 
@@ -235,7 +225,6 @@ class AgencyDataJob:
                     }
                 }
             else:
-                # Dry run: Compute planned steps without performing external actions
                 files_planned = len(db_results)
                 try:
                     employment_processor = self._create_employment_history_processor(
@@ -315,7 +304,6 @@ class AgencyDataJob:
             agency_id=agency_id,
             destination_prefix=destination_prefix
         )
-        # Use the adapter to get a configured processor
         return get_configured_processor(config, agency_id=str(agency_id))
 
     def _create_employment_history_processor(self, agency_id: int, agency_s3_slug: str, destination_prefix: str):

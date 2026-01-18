@@ -1,4 +1,3 @@
-# Local variables
 locals {
   dag_bucket_name = var.dag_bucket_name != "" ? var.dag_bucket_name : "etl-airflow-dags-${var.environment}"
   
@@ -10,7 +9,6 @@ locals {
   }
 }
 
-# S3 bucket for DAG storage
 resource "aws_s3_bucket" "dags" {
   bucket = local.dag_bucket_name
 
@@ -19,7 +17,6 @@ resource "aws_s3_bucket" "dags" {
   })
 }
 
-# Enable versioning for rollback capability
 resource "aws_s3_bucket_versioning" "dags" {
   bucket = aws_s3_bucket.dags.id
 
@@ -28,7 +25,6 @@ resource "aws_s3_bucket_versioning" "dags" {
   }
 }
 
-# Server-side encryption
 resource "aws_s3_bucket_server_side_encryption_configuration" "dags" {
   bucket = aws_s3_bucket.dags.id
 
@@ -39,7 +35,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "dags" {
   }
 }
 
-# Block public access
 resource "aws_s3_bucket_public_access_block" "dags" {
   bucket = aws_s3_bucket.dags.id
 
@@ -49,7 +44,6 @@ resource "aws_s3_bucket_public_access_block" "dags" {
   restrict_public_buckets = true
 }
 
-# Lifecycle policy for old versions
 resource "aws_s3_bucket_lifecycle_configuration" "dags" {
   count  = var.enable_bucket_versioning ? 1 : 0
   bucket = aws_s3_bucket.dags.id
@@ -64,7 +58,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "dags" {
   }
 }
 
-# IAM role for Airflow service account (IRSA)
 data "aws_iam_policy_document" "airflow_assume_role" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -95,7 +88,6 @@ resource "aws_iam_role" "airflow_service_account" {
   tags = local.common_tags
 }
 
-# IAM policy for Airflow to access DAG bucket
 data "aws_iam_policy_document" "airflow_s3_access" {
   statement {
     sid    = "ReadDAGBucket"
@@ -126,7 +118,6 @@ resource "aws_iam_role_policy_attachment" "airflow_s3_access" {
   policy_arn = aws_iam_policy.airflow_s3_access.arn
 }
 
-# IAM policy for package jobs to write DAGs
 data "aws_iam_policy_document" "package_dag_write" {
   statement {
     sid    = "WritePackageDAGs"
@@ -166,7 +157,6 @@ resource "aws_iam_policy" "package_dag_write" {
   tags = local.common_tags
 }
 
-# Data sources
 data "aws_caller_identity" "current" {}
 
 data "aws_eks_cluster" "cluster" {

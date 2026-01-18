@@ -862,10 +862,7 @@ class MonitoringRepository:
 
             return run
 
-        # Create new run
-        # Ensure required NOT NULL columns receive reasonable defaults for local/dev runs
         if file_size is None:
-            # Some DB schemas require file_size NOT NULL; default to 0 for created test runs
             file_size = 0
 
         sql_insert = """
