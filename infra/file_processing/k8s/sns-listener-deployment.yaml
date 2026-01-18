@@ -25,7 +25,7 @@ spec:
       containers:
         - name: sns-listener
           image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/file-processing:latest
-          command: ["python", "-m", "file_processing.cli.sns_main"]
+          command: ["python", "-m", "file_processing.cli.main", "run", "sns_listener"]
           envFrom:
             - configMapRef:
                 name: file-processing-config
