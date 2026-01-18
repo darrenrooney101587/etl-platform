@@ -23,7 +23,7 @@ provider "aws" {
     tags = {
       Environment = var.environment
       ManagedBy   = "Terraform"
-      Module      = "airflow"
+      Module      = "orchestration"
       Purpose     = "orchestration"
     }
   }
