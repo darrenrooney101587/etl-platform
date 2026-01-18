@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "etl-database-schema"
+version = "0.4.3"
+description = "Shared Django settings, templates, and static assets"
+authors = ["Darren Rooney <darren.rooney@benchmarkanalytics.com>"]
+packages = [{ include = "etl_database_schema" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+django = "4.2.25"
+python-dotenv = "^1.0.0"
+psycopg2-binary = "^2.9.10"
+django-ltree = "^0.5.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
