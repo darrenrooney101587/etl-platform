@@ -37,7 +37,7 @@ only the CLI arguments.
 
 Why this is recommended
 
-- No Django runtime required in the image (Django belongs to `etl-database-schema` only).
+- Django models now live in `etl_core/models` instead of external package.
 - Reproducible images: dependencies are installed at build time.
 - EKS Jobs: keep ENTRYPOINT stable; pass only args in Job manifests.
 - Easier testing and DI: `cli` modules are lightweight and unit-testable.

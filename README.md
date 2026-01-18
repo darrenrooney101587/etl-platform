@@ -16,11 +16,11 @@ Modules
 
 2. `pipeline_processing`
 - Purpose: Transforms, enrichment, ingestion jobs, and file processing workflows.
-- Dependencies: `etl_core`, `etl-database-schema` (optional).
+- Dependencies: `etl_core`.
 
 3. `observability`
 - Purpose: Platform monitoring and freshness/health checks.
-- Dependencies: `etl_core`, `etl-database-schema` (optional).
+- Dependencies: `etl_core`.
 
 Packaging & dependencies
 
