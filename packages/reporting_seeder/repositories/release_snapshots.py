@@ -34,7 +34,7 @@ class ReleaseSnapshotRepository:
         if self._snapshot_model is not None:
             return self._snapshot_model
         try:
-            from etl_database_schema.apps.bms_reporting.models import SeederReleaseSnapshot
+            from etl_core.models.apps.bms_reporting.models import SeederReleaseSnapshot
 
             return SeederReleaseSnapshot
         except Exception as exc:  # pragma: no cover - runtime dependency

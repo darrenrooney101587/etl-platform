@@ -1,7 +1,7 @@
 """Repository for recording refresh history and metrics using Django ORM.
 
 This implementation uses the upstream models from
-`etl_database_schema.apps.bms_reporting.models` (or other layout variants)
+`etl_core.models.apps.bms_reporting.models` (or other layout variants)
 and performs ORM operations. Django must be configured (set DJANGO_SETTINGS_MODULE
 and call django.setup()) before instantiating or using this repository.
 """
@@ -39,11 +39,11 @@ class HistoryRepository:
             RuntimeError: if Django or the models are not available. The
             message explains how to bootstrap Django for callers.
         """
-        # Try a few known import paths to support different etl_database_schema layouts
+        # Try a few known import paths to support different etl_core.models layouts
         candidates = (
-            "etl_database_schema.apps.bms_reporting.models",
-            "etl_database_schema.apps.reporting.models",
-            "etl_database_schema.apps.bms.models",
+            "etl_core.models.apps.bms_reporting.models",
+            "etl_core.models.apps.reporting.models",
+            "etl_core.models.apps.bms.models",
         )
         last_exc: Exception | None = None
         for mod_path in candidates:

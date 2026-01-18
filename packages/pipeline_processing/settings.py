@@ -1,6 +1,6 @@
 """Minimal Django settings for pipeline_processing jobs and services.
 
-Used to bootstrap Django when consuming `etl_database_schema` models.
+Used to bootstrap Django when consuming `etl_core.models` models.
 """
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import os
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
-    "etl_database_schema.apps.bms",
-    "etl_database_schema.apps.bms_reporting",
+    "etl_core.models.apps.bms",
+    "etl_core.models.apps.bms_reporting",
 ]
 
 db_default = {

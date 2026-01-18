@@ -157,22 +157,14 @@ Code that uses `etl_core.support.db_factory.get_database_client()` will instanti
 ## Local Docker development (recommended)
 
 `reporting_seeder` requires:
-- `etl_core` (local monorepo package)
-- `etl_database_schema` (private schema package)
+- `etl_core` (local monorepo package with Django models)
 
-To avoid pulling `etl-database-schema` from GitLab during every Docker build (VPN dependency), the local workflow uses a sibling checkout staged into the Docker build context.
-
-1) One-time: clone the schema repo next to this repo:
-```bash
-git clone git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git ../etl-database-schema
-```
-
-2) Build the local image (stages schema into `.local/etl-database-schema` and builds from repo root):
+1) Build the local image:
 ```bash
 ./packages/reporting_seeder/scripts/build.sh
 ```
 
-3) Run the container locally:
+2) Run the container locally:
 
  Show CLI help:
  ```bash
@@ -197,29 +189,16 @@ docker run --rm \
   etl-reporting-seeder run refresh_all
 ```
 
-By default, this expects the schema repo to be checked out next to the repo root at `../etl-database-schema`.
-If the clone lives elsewhere, pass an explicit path:
-```bash
-./packages/reporting_seeder/scripts/build.sh --schema-path /absolute/path/to/etl-database-schema
-```
+### Updating code (local dev)
 
-### Updating code and schema (local dev)
-
-Repository and schema updates require re-building the local image:
-
-- Update `etl-platform` source and rebuild the image
-- Update the sibling `etl-database-schema` checkout and rebuild the image
+Repository updates require re-building the local image:
 
 Example:
 ```bash
 # Update this repo
 git pull
 
-# Update the schema repo (sibling to this repo)
-cd ../etl-database-schema && git pull
-
-# Rebuild the local image (restages schema into .local/ and rebuilds)
-cd -
+# Rebuild the local image
 ./packages/reporting_seeder/scripts/build.sh
 ```
 

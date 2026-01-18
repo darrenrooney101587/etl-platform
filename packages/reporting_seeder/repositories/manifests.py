@@ -1,6 +1,6 @@
 """Repository for fetching reporting manifests (custom + canned).
 
-This repository now uses Django ORM models from `etl_database_schema` instead
+This repository now uses Django ORM models from `etl_core.models` instead
 of raw SQL. Django must be bootstrapped (DJANGO_SETTINGS_MODULE + django.setup())
 before instantiating this repository.
 """
@@ -17,7 +17,7 @@ class ManifestRepository:
         the repository runs raw SQL and returns dict rows (used by tests and
         legacy callers).
       - ORM mode: when no db_client is provided, the repository imports Django
-        ORM models from `etl_database_schema` and returns mapped rows.
+        ORM models from `etl_core.models` and returns mapped rows.
 
     This lets callers choose the lightweight SQL path for fast access in
     non-Django contexts (tests, lightweight runners) while allowing full ORM
@@ -35,14 +35,14 @@ class ManifestRepository:
         Raises RuntimeError with guidance when models are unavailable.
         """
         try:
-            from etl_database_schema.apps.bms_reporting.models import (
+            from etl_core.models.apps.bms_reporting.models import (
                 SeederCustomReportManifest,
                 SeederCannedReportManifest,
                 SeederCannedReport,
                 SeederJobStatus,
             )
             # Agency model lives in the bms app
-            from etl_database_schema.apps.bms.models import Agency
+            from etl_core.models.apps.bms.models import Agency
 
             return (
                 SeederCustomReportManifest,
