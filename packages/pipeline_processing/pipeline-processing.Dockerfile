@@ -15,14 +15,14 @@ RUN pip install poetry
 # Copy etl_core
 COPY packages/etl_core /app/packages/etl_core
 
-# Copy data_pipeline
-COPY packages/data_pipeline /app/packages/data_pipeline
+# Copy pipeline_processing
+COPY packages/pipeline_processing /app/packages/pipeline_processing
 
 # Install dependencies
-WORKDIR /app/packages/data_pipeline
+WORKDIR /app/packages/pipeline_processing
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --extras db
 
 # Entrypoint: expose the installed console script (stable for EKS Jobs)
-ENTRYPOINT ["data-pipeline"]
+ENTRYPOINT ["pipeline-processing"]
 CMD ["--help"]

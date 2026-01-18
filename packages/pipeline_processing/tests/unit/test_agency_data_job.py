@@ -2,8 +2,8 @@ import sys
 from unittest.mock import MagicMock, Mock, patch
 import unittest
 
-from data_pipeline.jobs.agency_data_job import AgencyDataJob
-from data_pipeline.tests.unit.conftest import setup_mocks
+from pipeline_processing.jobs.agency_data_job import AgencyDataJob
+from pipeline_processing.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 

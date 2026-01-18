@@ -1,4 +1,4 @@
-"""Example job for `data_pipeline` demonstrating the JOB convention.
+"""Example job for `pipeline_processing` demonstrating the JOB convention.
 
 This job is intentionally minimal and side-effect free so you can run it
 locally as a demo. It shows how to expose a `JOB` tuple that the shared

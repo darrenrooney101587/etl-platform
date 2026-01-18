@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "data-pipeline"
+name = "pipeline-processing"
 version = "0.1.0"
 description = "Combined transforms + ingestion runtime lane"
 authors = ["Admin <admin@example.com>"]
 readme = "README.md"
-packages = [{ include = "data_pipeline", from = ".." }]
+packages = [{ include = "pipeline_processing", from = ".." }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -19,8 +19,8 @@ etl-database-schema = { git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-dat
 db = ["etl-database-schema", "django"]
 
 [tool.poetry.scripts]
-data-pipeline-get-s3-files = "data_pipeline.cli.get_s3_files:main"
-data-pipeline = "data_pipeline.cli.main:main"
+pipeline-processing-get-s3-files = "pipeline_processing.cli.get_s3_files:main"
+pipeline-processing = "pipeline_processing.cli.main:main"
 
 [build-system]
 requires = ["poetry-core"]

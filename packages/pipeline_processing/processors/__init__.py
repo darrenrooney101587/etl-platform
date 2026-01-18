@@ -1,4 +1,4 @@
-"""Compatibility adapters: lazy re-exports of etl_core processors under data_pipeline.processors."""
+"""Compatibility adapters: lazy re-exports of etl_core processors under pipeline_processing.processors."""
 from importlib import import_module
 from typing import Any
 

@@ -8,13 +8,13 @@ services:
       - ../packages/file_processing:/app/packages/file_processing
       - ../packages/etl_core:/app/packages/etl_core
 
-  data-pipeline:
-    image: etl-data-pipeline
+  pipeline-processing:
+    image: etl-pipeline-processing
     build:
       context: ../
-      dockerfile: ../packages/data_pipeline/data-pipeline.Dockerfile
+      dockerfile: ../packages/pipeline_processing/pipeline-processing.Dockerfile
     volumes:
-      - ../packages/data_pipeline:/app/packages/data_pipeline
+      - ../packages/pipeline_processing:/app/packages/pipeline_processing
       - ../packages/etl_core:/app/packages/etl_core
 
   observability:

@@ -1,6 +1,6 @@
 """Job-specific adapters for the generic S3FileProcessor.
 
-This module lives under `packages/data_pipeline` and provides small wrappers
+This module lives under `packages/pipeline_processing` and provides small wrappers
 that apply business conventions (agency prefix, destination key layout,
 mapping keys, metadata filenames) while keeping `etl_core` generic.
 """
@@ -56,7 +56,7 @@ def get_configured_processor(
         agency_id: Optional[str] = None,
         mapping_keys: Optional[Dict[str, str]] = None,
 ) -> S3FileProcessor:
-    """Return an S3FileProcessor configured for the data_pipeline job.
+    """Return an S3FileProcessor configured for the pipeline_processing job.
 
     This function wires job-specific conventions into the generic processor.
 

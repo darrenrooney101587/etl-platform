@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional
 
 from etl_core.database.client import DatabaseClient
 from etl_core.config.config import EmploymentHistoryConfig, S3Config
-from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
-from data_pipeline.shared.s3_adapter import get_configured_processor, upload_attachment_manifest
-from data_pipeline.repositories.attachment_repository import AttachmentRepository
+from pipeline_processing.processors.employment_history_processor import EmploymentHistoryProcessor
+from pipeline_processing.shared.s3_adapter import get_configured_processor, upload_attachment_manifest
+from pipeline_processing.repositories.attachment_repository import AttachmentRepository
 
 logger = logging.getLogger(__name__)
 

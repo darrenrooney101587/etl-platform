@@ -5,8 +5,8 @@ This module contains unit tests for all methods in the EmploymentHistoryProcesso
 focusing on individual method behavior and employment history processing functionality.
 """
 from etl_core.config.config import EmploymentHistoryConfig
-from data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
-from data_pipeline.tests.unit.conftest import setup_mocks
+from pipeline_processing.processors.employment_history_processor import EmploymentHistoryProcessor
+from pipeline_processing.tests.unit.conftest import setup_mocks
 
 setup_mocks()
 
@@ -71,7 +71,7 @@ class TestEmploymentHistoryProcessor(unittest.TestCase):
         self.assertIs(processor.s3_client, self.mock_s3_client)
         self.assertIsNone(processor.data)
 
-    @patch("data_pipeline.database.client.DatabaseClient.get_organization_employment_history")
+    @patch("pipeline_processing.database.client.DatabaseClient.get_organization_employment_history")
     def test_fetch_data_success(self, mock_get_data: Mock) -> None:
         """Test successful data fetching."""
         processor = EmploymentHistoryProcessor(self.sample_employment_config, self.mock_s3_client)
@@ -83,7 +83,7 @@ class TestEmploymentHistoryProcessor(unittest.TestCase):
         self.assertEqual(result, self.sample_employment_data)
         self.assertEqual(processor.data, self.sample_employment_data)
 
-    @patch("data_pipeline.database.client.DatabaseClient.get_organization_employment_history")
+    @patch("pipeline_processing.database.client.DatabaseClient.get_organization_employment_history")
     def test_fetch_data_exception(self, mock_get_data: Mock) -> None:
         """Test data fetching with exception."""
         processor = EmploymentHistoryProcessor(self.sample_employment_config, self.mock_s3_client)
@@ -118,7 +118,7 @@ class TestEmploymentHistoryProcessor(unittest.TestCase):
         self.assertEqual(fieldnames, expected_fields)
         self.assertEqual(len(fieldnames), len(expected_fields))
 
-    @patch("data_pipeline.processors.employment_history_processor.datetime")
+    @patch("pipeline_processing.processors.employment_history_processor.datetime")
     def test_get_filename(self, mock_datetime: Mock) -> None:
         """Test filename generation."""
         processor = EmploymentHistoryProcessor(self.sample_employment_config, self.mock_s3_client)
@@ -177,7 +177,7 @@ class TestEmploymentHistoryProcessor(unittest.TestCase):
 
             self.assertEqual(result["status"], "success")
 
-    @patch("data_pipeline.database.client.DatabaseClient.get_organization_employment_history")
+    @patch("pipeline_processing.database.client.DatabaseClient.get_organization_employment_history")
     def test_upload_to_s3_without_existing_data(self, mock_get_data: Mock) -> None:
         """Test S3 upload without existing data (triggers fetch)."""
         processor = EmploymentHistoryProcessor(self.sample_employment_config, self.mock_s3_client)

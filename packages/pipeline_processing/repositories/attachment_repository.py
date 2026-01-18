@@ -1,6 +1,6 @@
 """Repository layer for attachments and S3 business queries.
 
-This module moves domain-specific SQL out of `etl_core` into the data_pipeline
+This module moves domain-specific SQL out of `etl_core` into the pipeline_processing
 package as a repository. Callers should inject `etl_core.database.client.DatabaseClient`
 so tests can mock DB access.
 """
