@@ -3,10 +3,10 @@ import logging
 from django.db import transaction
 from django.db import models
 
-from etl_database_schema.apps.bms.models.agency import Agency
-from etl_database_schema.apps.bms.models.benchmark_role import BenchmarkRole
-from etl_database_schema.apps.bms.models.benchmark_user import BenchmarkUser
-from etl_database_schema.apps.bms.models.group import Group
+from etl_core.models.apps.bms.models.agency import Agency
+from etl_core.models.apps.bms.models.benchmark_role import BenchmarkRole
+from etl_core.models.apps.bms.models.benchmark_user import BenchmarkUser
+from etl_core.models.apps.bms.models.group import Group
 
 log = logging.getLogger(__name__)
 

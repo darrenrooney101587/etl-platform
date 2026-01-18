@@ -1,7 +1,7 @@
 from django.db import models
 import uuid
 
-from etl_database_schema.apps.bms.models.benchmark_user import BenchmarkUser
+from etl_core.models.apps.bms.models.benchmark_user import BenchmarkUser
 
 
 class KmiCourse(models.Model):

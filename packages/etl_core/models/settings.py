@@ -10,11 +10,11 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
-    "etl_database_schema.apps.bms",
-    "etl_database_schema.apps.bms_reporting",
-    "etl_database_schema.apps.account",
-    "etl_database_schema.apps.bms_security",
-    "etl_database_schema.apps.bms_organization",
+    "etl_core.models.apps.bms",
+    "etl_core.models.apps.bms_reporting",
+    "etl_core.models.apps.account",
+    "etl_core.models.apps.bms_security",
+    "etl_core.models.apps.bms_organization",
 ]
 
 # Configure database from environment variables (consistent with SeederConfig)

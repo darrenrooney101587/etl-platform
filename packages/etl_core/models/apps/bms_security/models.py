@@ -8,7 +8,7 @@
 from django.db import models
 from django.db.models import UniqueConstraint
 
-from etl_database_schema.apps.bms.models import BenchmarkUser
+from etl_core.models.apps.bms.models import BenchmarkUser
 
 
 class AgencyConfiguration(models.Model):

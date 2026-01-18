@@ -1,6 +1,6 @@
 from django.db import models
 
-from etl_database_schema.apps.bms.models.benchmark_user import BenchmarkUser
+from etl_core.models.apps.bms.models.benchmark_user import BenchmarkUser
 
 
 class IntegrationError(models.Model):

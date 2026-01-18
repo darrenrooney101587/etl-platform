@@ -4,17 +4,17 @@ import logging
 from django.db import models
 from django.db import transaction
 from django.conf import settings
-# from etl_database_schema.apps.services import bms_cache
-from etl_database_schema.apps.bms.models.snapshot import Snapshot
-from etl_database_schema.apps.bms.models.config import (
+# from etl_core.models.apps.services import bms_cache
+from etl_core.models.apps.bms.models.snapshot import Snapshot
+from etl_core.models.apps.bms.models.config import (
     ConfigOption,
     ConfigScheme,
     ConfigOptionValue,
     ConfigContext,
 )
-from etl_database_schema.apps.bms.models.workflow import Transition
-from etl_database_schema.apps.bms.models.template import TemplateWorkflow
-from etl_database_schema.apps.bms.models.errors import LinkingError
+from etl_core.models.apps.bms.models.workflow import Transition
+from etl_core.models.apps.bms.models.template import TemplateWorkflow
+from etl_core.models.apps.bms.models.errors import LinkingError
 
 log = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class Agency(models.Model):
 
     @property
     def get_orphaned_forms(self):
-        from etl_database_schema.apps.bms.models.form import Form
+        from etl_core.models.apps.bms.models.form import Form
 
         """ Gets a custom list of the forms that have been orphaned """
         query = '''

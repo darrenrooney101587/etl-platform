@@ -3,7 +3,7 @@ import logging
 from django.db import transaction
 from django.db import models
 
-from etl_database_schema.apps.bms.models.group import Group, AgencyGroup
+from etl_core.models.apps.bms.models.group import Group, AgencyGroup
 
 log = logging.getLogger(__name__)
 

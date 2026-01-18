@@ -1,5 +1,5 @@
 from django.db import models
-from etl_database_schema.apps.bms.models.json import JSONNonBField
+from etl_core.models.apps.bms.models.json import JSONNonBField
 
 
 class EventConfigurationSchemeTemplateTypeManager(models.Manager):

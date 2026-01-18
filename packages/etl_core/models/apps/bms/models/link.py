@@ -1,7 +1,7 @@
 from django.db import models
 
-from etl_database_schema.apps.bms.models.form import Form
-from etl_database_schema.apps.bms.models.benchmark_user import BenchmarkUser
+from etl_core.models.apps.bms.models.form import Form
+from etl_core.models.apps.bms.models.benchmark_user import BenchmarkUser
 
 
 class Link(models.Model):

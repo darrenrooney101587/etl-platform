@@ -3,13 +3,13 @@ import logging
 from django.db import models
 from django.db import transaction
 
-from etl_database_schema.apps.bms.models.config import ConfigOptionValue
-from etl_database_schema.apps.bms.models.event import EventConfigurationSchemeTemplateType, EventSchemeHandler
-from etl_database_schema.apps.bms.models.handler import Handler
-from etl_database_schema.apps.bms.models.validation import ValidationVersion
-from etl_database_schema.apps.bms.models.errors import ConfigError
-from etl_database_schema.apps.bms.models.json import JSONNonBField
-from etl_database_schema.apps.bms.models.screen import Screen
+from etl_core.models.apps.bms.models.config import ConfigOptionValue
+from etl_core.models.apps.bms.models.event import EventConfigurationSchemeTemplateType, EventSchemeHandler
+from etl_core.models.apps.bms.models.handler import Handler
+from etl_core.models.apps.bms.models.validation import ValidationVersion
+from etl_core.models.apps.bms.models.errors import ConfigError
+from etl_core.models.apps.bms.models.json import JSONNonBField
+from etl_core.models.apps.bms.models.screen import Screen
 
 log = logging.getLogger(__name__)
 

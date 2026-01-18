@@ -7,9 +7,9 @@ from django.contrib.postgres.fields import ArrayField
 import logging
 import uuid
 
-from etl_database_schema.apps.bms.models import Agency
-from etl_database_schema.apps.bms_organization.managers import HKTreeManager
-from etl_database_schema.apps.bms_security.models import BenchmarkRole
+from etl_core.models.apps.bms.models import Agency
+from etl_core.models.apps.bms_organization.managers import HKTreeManager
+from etl_core.models.apps.bms_security.models import BenchmarkRole
 
 log = logging.getLogger(__name__)
 

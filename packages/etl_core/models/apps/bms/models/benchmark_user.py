@@ -2,12 +2,13 @@ from django.db import models
 from django.contrib.postgres.fields import citext
 from django.db.models import UniqueConstraint
 
-from etl_database_schema.apps.bms.models.json import JSONNonBField
-from etl_database_schema.apps.bms.models.benchmark_role import BenchmarkRole
-from etl_database_schema.apps.bms.models.action_log import ActionLog
-from etl_database_schema.apps.bms.models.group import Group
-from etl_database_schema.apps.bms.models.snapshot import AbstractSnapshot, SnapshotUserManager
-from etl_database_schema.apps.bms.models.notification import Notification
+from etl_core.models.apps.bms.models.json import JSONNonBField
+from etl_core.models.apps.bms.models.benchmark_role import BenchmarkRole
+# TODO: ActionLog model not migrated
+# from etl_core.models.apps.bms.models.action_log import ActionLog
+from etl_core.models.apps.bms.models.group import Group
+from etl_core.models.apps.bms.models.snapshot import AbstractSnapshot, SnapshotUserManager
+from etl_core.models.apps.bms.models.notification import Notification
 
 
 class BenchmarkRoleUser(models.Model):

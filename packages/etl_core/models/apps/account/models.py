@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
 
-from etl_database_schema.apps.bms.models import Agency
+from etl_core.models.apps.bms.models import Agency
 
 
 class LoginAttempt(models.Model):

@@ -3,11 +3,12 @@ import logging
 from django.db import models
 from django.db import transaction
 
-from etl_database_schema.apps.bms.models.json import JSONNonBField
-from etl_database_schema.apps.bms.models.action_log import ActionLog
-from etl_database_schema.apps.bms.models.notification import Notification
-from etl_database_schema.apps.bms.models.errors import WorkflowError, FormError
-from etl_database_schema.apps.bms.models.workflow import WorkflowLabel, Action, Movement
+from etl_core.models.apps.bms.models.json import JSONNonBField
+# TODO: ActionLog model not migrated
+# from etl_core.models.apps.bms.models.action_log import ActionLog
+from etl_core.models.apps.bms.models.notification import Notification
+from etl_core.models.apps.bms.models.errors import WorkflowError, FormError
+from etl_core.models.apps.bms.models.workflow import WorkflowLabel, Action, Movement
 
 log = logging.getLogger(__name__)
 

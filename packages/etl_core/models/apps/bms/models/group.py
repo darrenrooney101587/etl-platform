@@ -1,6 +1,6 @@
 from django.db import models
 
-from etl_database_schema.apps.bms.models.workflow import Workflow
+from etl_core.models.apps.bms.models.workflow import Workflow
 
 
 class Group(models.Model):

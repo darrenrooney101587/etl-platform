@@ -1,10 +1,10 @@
-from etl_database_schema.apps.bms.models.errors import WorkflowError
+from etl_core.models.apps.bms.models.errors import WorkflowError
 import logging
 
 from django.utils.text import slugify
 from django.db import models
 
-from etl_database_schema.apps.bms.models.notification import Notification
+from etl_core.models.apps.bms.models.notification import Notification
 
 log = logging.getLogger(__name__)
 

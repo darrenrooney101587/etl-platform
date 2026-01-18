@@ -1,10 +1,11 @@
 from django.apps.registry import apps
 from django.db import models
 
-from etl_database_schema.apps.bms.models.json import JSONNonBField
-from etl_database_schema.apps.bms.models.action_log import ActionLog
-from etl_database_schema.apps.bms.models.notification import Notification
-from etl_database_schema.apps.bms.models.form import Form
+from etl_core.models.apps.bms.models.json import JSONNonBField
+# TODO: ActionLog model not migrated - file missing from upstream
+# from etl_core.models.apps.bms.models.action_log import ActionLog
+from etl_core.models.apps.bms.models.notification import Notification
+from etl_core.models.apps.bms.models.form import Form
 
 
 class SnapshotManager(models.Manager):
@@ -79,10 +80,12 @@ class SnapshotForm(AbstractSnapshot):
 
     @property
     def actionlogs(self):
-        return ActionLog.objects.raw(
-            "SELECT * FROM action_log WHERE action_data ->> 'formId'='%s'",
-            [self.form_id],
-        )
+        # TODO: ActionLog model not migrated - file missing from upstream
+        # return ActionLog.objects.raw(
+        #     "SELECT * FROM action_log WHERE action_data ->> 'formId'='%s'",
+        #     [self.form_id],
+        # )
+        return []
 
     @property
     def notifications(self):
