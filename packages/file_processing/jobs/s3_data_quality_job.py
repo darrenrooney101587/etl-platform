@@ -154,6 +154,7 @@ def entrypoint(argv: List[str]) -> int:
             django.setup()
 
             db_client = DatabaseClient()
+            # S3Config requires bucket args even if not used by the processor which uses event.bucket
             s3_config = S3Config(
                 source_bucket=os.getenv("S3_SOURCE_BUCKET", "ignored"),
                 destination_bucket=os.getenv("S3_DESTINATION_BUCKET", "ignored"),
