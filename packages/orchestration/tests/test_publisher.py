@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from airflow_dag_publisher.publisher import DAGPublisher
+from orchestration.publisher import DAGPublisher
 
 
 class TestDAGPublisher(unittest.TestCase):

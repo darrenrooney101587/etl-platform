@@ -43,12 +43,12 @@ This package was updated to make materialized-view refreshes robust and operator
 
 - Auto-creation of unique indexes has been intentionally removed. Creating a correct unique index requires domain knowledge about the view's data; automatically guessing a unique key is unsafe. Operators should create appropriate unique indexes via migrations or manual SQL when concurrent refresh is required.
 
-- The `has_unique_index` check has been removed from the codebase. We cannot guarantee that each materialized view will have a unique index. The refresh logic now relies on PostgreSQL's runtime error handling: when concurrent refresh is attempted on a view without a unique index, PostgreSQL raises an error which is caught and triggers an automatic fallback to non-concurrent refresh.
+- The `has_unique_index` check has been removed from the codebase. The refresh logic now relies on PostgreSQL's runtime error handling: when concurrent refresh is attempted on a view without a unique index, PostgreSQL raises an error which is caught and triggers an automatic fallback to non-concurrent refresh.
 
 - The processor collects PostgreSQL-side metrics (via `pg_stat_statements` / `pg_stat_activity`) where available, and records these in the seeder history tables so the team can observe DB-side cost (I/O, time) for each manifest.
 
 ## Throttling, leveling, and safety levers
-To avoid flooding the database, the seeder exposes several environment-configurable levers. These are designed to be conservative by default and let you tune how aggressively the job submits/executes refreshes.
+To avoid flooding the database, the seeder exposes several environment-configurable levers. These are designed to be conservative by default and allow tuning of how aggressively the job submits/executes refreshes.
 
 Environment variables (defaults shown)
 
@@ -71,7 +71,7 @@ Recommended conservative example for shared production DBs
 - `SEEDER_BATCH_SIZE=2`
 - `SEEDER_START_DELAY_MS=500` (0.5s)
 - `SEEDER_MAX_DB_ACTIVE_QUERIES=20`
-- `SEEDER_REFRESH_CONCURRENTLY=false` (unless you have inspected and created unique indexes)
+- `SEEDER_REFRESH_CONCURRENTLY=false` (enable only after creating appropriate unique indexes)
 
 These settings reduce concurrency and submit rate, and add a small spacing between batches to avoid sudden bursts.
 
@@ -79,7 +79,7 @@ These settings reduce concurrency and submit rate, and add a small spacing betwe
 - The seeder attempts to collect metrics from `pg_stat_statements` (if installed) and `pg_stat_activity`. These provide:
   - `calls`, `total_exec_time`, `mean_exec_time`, `rows`, and block I/O counters (when `pg_stat_statements` is available).
   - Current active query information (from `pg_stat_activity`) used by the DB-aware throttle.
-- We recommend enabling `pg_stat_statements` on the RDS/PG server to improve visibility. If it is not available the seeder logs will still work but postgres-side metrics will be absent.
+- Enabling `pg_stat_statements` on the RDS/PG server is recommended to improve visibility. If it is not available the seeder logs will still work but postgres-side metrics will be absent.
 
 ## Quickstart (local)
 ```bash
@@ -105,7 +105,7 @@ poetry run python -m cli.main run refresh_all -- --report-type custom
 # Run only canned manifests
 poetry run python -m cli.main run refresh_all -- --report-type canned
 
-# Or, if you prefer to install the package entrypoint so `reporting-seeder` is available:
+# Or, if installing the package entrypoint is preferred, install via `poetry install` to enable the `reporting-seeder` command:
 # 1) install the package (creates the script entrypoint)
 cd packages/reporting_seeder
 poetry install --no-interaction --no-ansi
@@ -113,17 +113,16 @@ poetry install --no-interaction --no-ansi
 poetry run reporting-seeder run refresh_all
 ```
 
-Note: you saw a warning like "Warning: 'reporting-seeder' is an entry point defined in pyproject.toml, but it's not installed as a script" because you tried to run the entrypoint without installing the package. Use the first (module) option for quick runs, or run `poetry install` in the package directory once to enable the `reporting-seeder` command.
-
+## Running single agency / manifest
 ```bash
-# Run a single agency by slug (recommended module run)
+# Run a single agency by slug (module run)
 cd packages/reporting_seeder
 poetry run python -m cli.main run refresh_agency demo
 
-# Or, if you have installed the package entrypoint via `poetry install`:
+# Or, if the package entrypoint is installed via `poetry install`:
 poetry run reporting-seeder run refresh_agency demo
 
-# Run a specific manifest record by table name (recommended module run)
+# Run a specific manifest record by table name (module run)
 cd packages/reporting_seeder
 poetry run python -m cli.main run refresh_table reporting.reports
 
@@ -133,7 +132,7 @@ poetry run reporting-seeder run refresh_table reporting.reports
 
 ## Using the Django ORM (developer example)
 
-If you have an upstream package that provides Django settings and models (for example `packages/reporting_models`), you can bootstrap Django at runtime and use a Django-backed DB client.
+If an upstream package provides Django settings and models (for example `packages/reporting_models`), bootstrapping Django at runtime allows use of a Django-backed DB client.
 
 Example helper `reporting_seeder.django_bootstrap` exposes `bootstrap_django` and `DjangoORMClient`.
 
@@ -141,7 +140,7 @@ Direct bootstrap example:
 
 ```python
 from reporting_seeder.django_bootstrap import bootstrap_django, DjangoORMClient
-# Ensure your reporting_models.settings exists and is importable
+# Ensure an importable settings module exists (for example: reporting_models.settings)
 bootstrap_django("reporting_models.settings")
 db = DjangoORMClient()
 rows = db.fetch_all("SELECT id, name FROM reporting.some_table LIMIT 10")
@@ -179,7 +178,7 @@ git clone git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git ../e
  ```bash
  docker run --rm etl-reporting-seeder --help
  ```
- 
+  
  Run a job (examples):
  ```bash
  # List jobs
@@ -199,17 +198,17 @@ docker run --rm \
 ```
 
 By default, this expects the schema repo to be checked out next to the repo root at `../etl-database-schema`.
-If your clone lives elsewhere, pass an explicit path:
+If the clone lives elsewhere, pass an explicit path:
 ```bash
 ./packages/reporting_seeder/scripts/build.sh --schema-path /absolute/path/to/etl-database-schema
 ```
 
 ### Updating code and schema (local dev)
 
-You do not need to re-clone `etl-database-schema` each time.
+Repository and schema updates require re-building the local image:
 
-- If `etl-platform` changes (this repo): pull and rebuild the image.
-- If `etl-database-schema` changes: `git pull` in the sibling checkout and rebuild the image.
+- Update `etl-platform` source and rebuild the image
+- Update the sibling `etl-database-schema` checkout and rebuild the image
 
 Example:
 ```bash

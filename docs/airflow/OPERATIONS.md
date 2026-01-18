@@ -188,7 +188,7 @@ kubectl logs -n etl-jobs <pod-name> -f
 
 5. Verify DAG syntax locally:
    ```bash
-   cd packages/airflow_dag_publisher
+   cd packages/orchestration
    poetry run airflow-dag-publisher validate \
      --package-name <package> \
      --dag-file <path_to_dag>

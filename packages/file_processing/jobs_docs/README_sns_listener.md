@@ -10,7 +10,7 @@ The SNS HTTP listener (`packages/file_processing/jobs/sns_listener.py`) implemen
   - Env vars:
     - `CIRCUIT_BREAKER_MAX_FAILURES` (default `5`) — consecutive failing jobs before the breaker activates.
     - `CIRCUIT_BREAKER_COOLDOWN_SECONDS` (default `60`) — how long to wait before the breaker auto-resets.
-  - While active the handler will skip submitting new jobs and respond with `{"status": "skipped"}`. You can change this behavior to return a 5xx if you prefer SNS to retry automatically.
+  - While active the handler will skip submitting new jobs and respond with `{"status": "skipped"}`. An alternate behavior is to return a 5xx response so SNS will retry automatically.
   - The circuit breaker is per-pod (in-memory). Restarting the pod will reset the breaker.
 
 - **Admin endpoints** (development):
@@ -31,7 +31,7 @@ Both together are recommended for a robust in-process listener.
 
 Run the listener inside a container and attach it to the same Docker network as LocalStack so LocalStack can POST directly to the container by name.
 
-Ensure you have built the image first (`./packages/file_processing/scripts/build.sh`).
+The image must be built first (`./packages/file_processing/scripts/build.sh`).
 
 ```bash
 # Start the listener container using the job runner
@@ -82,7 +82,7 @@ ls -l ./dry_run_results.jsonl || echo "dry_run_results.jsonl not found in repo r
 
 ### Host-runner alternative
 
-If you prefer to run the listener on the host (no container), start it and publish to the pre-created topic using `host.docker.internal` as the subscription endpoint. This is useful for fast iteration and local debugging.
+If running the listener on the host (no container), start it and publish to the pre-created topic using `host.docker.internal` as the subscription endpoint. This option is useful for fast iteration and local debugging.
 
 ```bash
 # Start directly via poetry
@@ -92,4 +92,4 @@ poetry run python -m file_processing.cli.main run sns_listener
 
 ## Implementation Notes
 - The SNS listener invokes the job in-process using a background thread; logs and dry-run outputs appear where the listener runs (host terminal or container logs).
-- If you prefer jobs to run in separate containers or worker processes, we can change the listener to spawn a container or push messages to an SQS queue and run workers separately.
+- If separate containers or worker processes are required for job execution, the listener may be changed to spawn containers or push messages to an SQS queue and run workers separately.

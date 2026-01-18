@@ -1,6 +1,6 @@
 # Local development with LocalStack
 
-This folder contains helper artifacts to run a local AWS stack (SNS + S3) using LocalStack so you can develop and test packages in this monorepo without talking to real AWS.
+This folder contains helper artifacts to run a local AWS stack (SNS + S3) using LocalStack to enable local development and testing of packages in this monorepo without contacting real AWS.
 
 Perspectives
 - The monorepo contains multiple perspectives (projects): `file_processing`, `data_pipeline`, and `observability`.
@@ -8,7 +8,7 @@ Perspectives
 
 This folder contains:
 - `docker/` - LocalStack docker compose files
-- `scripts/setup_localstack.sh` - helper to create S3 bucket, SNS topic and subscribe your local listener
+- `scripts/setup_localstack.sh` - helper to create S3 bucket, SNS topic and subscribe the local listener
 
 Requirements
 - Docker & docker-compose
@@ -49,13 +49,13 @@ aws --endpoint-url="$EDGE" sns publish --topic-arn "$TOPIC_ARN" --message '{"Rec
 ```
 
 Notes
-- Use `host.docker.internal` on macOS so LocalStack can reach your host-based listener. Adjust the host for Linux if needed.
+- Use `host.docker.internal` on macOS so LocalStack can reach a host-based listener. Adjust the host for Linux if needed.
 - The LocalStack edge port is `4566`.
 - These resources are ephemeral and intended for local development only.
 
 ## Per-perspective helper scripts
 
-To make it easy to create LocalStack resources for a specific package/perspective, we provide small wrapper scripts under `infra/<perspective>/scripts/` that call the central `infra/local/scripts/setup_localstack.sh` with the correct perspective argument.
+To make it easy to create LocalStack resources for a specific package/perspective, small wrapper scripts are provided under `infra/<perspective>/scripts/` that call the central `infra/local/scripts/setup_localstack.sh` with the perspective argument.
 
 Available wrappers (examples):
 
@@ -72,4 +72,4 @@ infra/file_processing/scripts/setup_localstack.sh host.docker.internal 8080
 infra/data_pipeline/scripts/setup_localstack.sh host.docker.internal 8080
 ```
 
-These wrappers are thin and only provide a nicer developer UX; they call `infra/local/scripts/setup_localstack.sh` with the right perspective.
+These wrappers are thin and only provide a simpler developer UX; they call `infra/local/scripts/setup_localstack.sh` with the correct perspective.

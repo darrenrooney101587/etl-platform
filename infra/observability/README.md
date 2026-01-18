@@ -56,7 +56,7 @@ This will:
 - create a perspective-specific S3 bucket and SNS topic
 - subscribe an HTTP endpoint to the SNS topic
 
-If `observability` does not run an HTTP listener, you can still use the created bucket/topic for manual testing (publish events, create objects, etc).
+When `observability` does not run an HTTP listener, the created bucket/topic remain available for manual testing (publish events, create objects, etc).
 
 ## C) Push to `etl-playground` (AWS testing)
 

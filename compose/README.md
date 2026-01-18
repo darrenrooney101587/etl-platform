@@ -2,7 +2,7 @@
 
 This repo uses a monorepo layout where each package lives under `packages/`.
 
-Important: always run the `docker-compose` commands from the repository root so the compose build `context: ../` resolves to the repo root and Dockerfile COPY paths like `packages/...` succeed.
+Important: docker-compose commands should be executed from the repository root so the compose build `context: ../` resolves to the repo root and Dockerfile COPY paths like `packages/...` succeed.
 
 Quick commands (run from repo root):
 
@@ -35,9 +35,9 @@ packages/data_pipeline/build.sh
 packages/reporting_seeder/build.sh
 ```
 
-If a package requires private git dependencies at build time, consider one of the following:
+If a package requires private git dependencies at build time, the following options are recommended:
 - Generate and commit a `poetry.lock` for the package so the build does not need to resolve git+ssh references.
-- Use BuildKit and forward your SSH agent when building (CI/secure host):
+- Use BuildKit and forward an SSH agent when building (CI or a secure host):
 
 ```bash
 DOCKER_BUILDKIT=1 docker build --ssh default -t my-image -f packages/<pkg>/<pkg>.Dockerfile /path/to/repo
@@ -46,4 +46,4 @@ DOCKER_BUILDKIT=1 docker build --ssh default -t my-image -f packages/<pkg>/<pkg>
 Notes
 
 - The compose file intentionally uses `context: ../` (repo root) and `dockerfile: ../packages/<pkg>/<pkg>.Dockerfile` so package Dockerfiles can `COPY packages/<pkg>` paths.
-- If you prefer to build from inside a package directory, use the helper `build.sh` or explicitly pass the repo root as the build context (e.g. `docker build -f observability.Dockerfile ..`).
+- Building from inside a package directory is supported by using the helper `build.sh` or by explicitly passing the repo root as the build context (for example: `docker build -f observability.Dockerfile ..`).

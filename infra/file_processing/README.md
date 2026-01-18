@@ -61,9 +61,9 @@ cd infra/file_processing
 This will:
 - start LocalStack (if needed)
 - create a perspective-specific S3 bucket and SNS topic
-- subscribe your local listener (`host.docker.internal:8080`) as an SNS HTTP endpoint
+- subscribe the local listener (`host.docker.internal:8080`) as an SNS HTTP endpoint
 
-You can then publish a test SNS message (see `infra/local/scripts/setup_localstack.sh` output + `scripts/sns_test_topic.sh`).
+A test SNS message can then be published (see `infra/local/scripts/setup_localstack.sh` output + `scripts/sns_test_topic.sh`).
 
 ### C) Push to `etl-playground` (AWS testing)
 
@@ -94,7 +94,7 @@ This directory provisions a dedicated **EKS cluster** for the `file_processing` 
 - EKS cluster + managed node group
 - SNS topic for file processing
 - Optional: S3 bucket notifications (`s3:ObjectCreated:*`) -> SNS topic
-- Optional: HTTP subscription to SNS (`sns_endpoint_url`) if you provide a stable endpoint
+- Optional: HTTP subscription to SNS (`sns_endpoint_url`) if a stable endpoint is provided
 - Kubernetes resources deployed into the cluster:
   - Namespace
   - ServiceAccount
@@ -116,7 +116,7 @@ Values live in `terraform.tfvars`.
 ## Notes
 
 - For production-grade event delivery, SNS -> SQS tends to be more reliable than SNS -> HTTP. The current stack supports SNS -> HTTP to match the existing listener.
-- This stack assumes you have permissions to create EKS/IAM resources in the target AWS account.
+- This stack assumes the caller has permissions to create EKS/IAM resources in the target AWS account.
 
 ---
 
@@ -124,15 +124,15 @@ Values live in `terraform.tfvars`.
 
 The repository now includes Terraform resources that implement IRSA (OIDC provider + IAM role + least-privilege S3 policy) in `infra/file_processing/irsa.tf`.
 
-What you saw when you ran `aws iam list-open-id-connect-providers`:
+What follows is example output from running `aws iam list-open-id-connect-providers`:
 
-- If the output is an empty list (``{"OpenIDConnectProviderList": []}``), there is no existing OIDC provider in this AWS account for the cluster issuer. This is expected for a new cluster; Terraform will create the provider for you when you run `terraform apply`.
+- If the output is an empty list (``{"OpenIDConnectProviderList": []}``), there is no existing OIDC provider in this AWS account for the cluster issuer. This is expected for a new cluster; Terraform will create the provider when `terraform apply` is executed.
 
-If you already have an OIDC provider for this cluster, import it into Terraform instead of creating a duplicate (import instructions are below).
+Import existing OIDC provider instructions follow below.
 
 Concrete steps (copy/paste)
 
-1) Compute the cluster OIDC issuer and OIDC thumbprint (run locally on your macOS zsh):
+1) Compute the cluster OIDC issuer and OIDC thumbprint (examples use macOS zsh):
 
 ```bash
 # Get the issuer URL for the cluster
@@ -206,7 +206,7 @@ If the STS call returns a role ARN that matches `aws_iam_role.file_processing_sa
 
 Importing an existing OIDC provider (only if one already exists)
 
-If your account already has an OIDC provider for this cluster (check with `aws iam list-open-id-connect-providers` and `aws iam get-open-id-connect-provider --open-id-connect-provider-arn <arn>`), import it into Terraform instead of creating a new one:
+When an OIDC provider exists for this cluster (check with `aws iam list-open-id-connect-providers` and `aws iam get-open-id-connect-provider --open-id-connect-provider-arn <arn>`), import it into Terraform instead of creating a new one:
 
 ```bash
 # find provider ARN and import (use -chdir to target the terraform subdir)
@@ -415,24 +415,24 @@ aws --no-verify-ssl --endpoint-url "$EDGE" --region us-east-1 sns publish \
 
 Notes:
 - The setup script auto-detects if LocalStack is serving HTTPS and adds `--no-verify-ssl` to the AWS CLI calls (LocalStack uses a self-signed cert). Seeing `InsecureRequestWarning` is expected for local dev.
-- If you prefer valid TLS locally, map a LocalStack hostname (for example `localhost.localstack.cloud`) to `127.0.0.1` and set `LOCALSTACK_HOSTNAME` so cert SANs match — we can add a helper for that if you want.
+- If valid TLS is required locally, map a LocalStack hostname (for example `localhost.localstack.cloud`) to `127.0.0.1` and set `LOCALSTACK_HOSTNAME` so cert SANs match. A helper can be added if needed.
 
 6) Inspect logs:
 - LocalStack: `docker-compose -f infra/local/docker-compose.yml logs --tail=200 -f`
-- Listener: watch the terminal where you started `run_local_listener.sh` or run in your IDE.
+- Listener: monitor the terminal where `run_local_listener.sh` was started or run in an IDE.
 
 Troubleshooting (common issues)
 
 - LocalStack shows `Connection refused` when delivering to `host.docker.internal:8080`:
-  - Ensure the listener is running on your host and bound to all interfaces (0.0.0.0). The provided server binds to `("", port)` which accepts connections from Docker.
+  - Ensure the listener is running on the host and bound to all interfaces (0.0.0.0). The provided server binds to `("", port)` which accepts connections from Docker.
   - Run the container probe command from step 4 to confirm container -> host connectivity.
-  - If the probe fails, confirm Docker Desktop is running and `host.docker.internal` resolves. On Linux you may need to use your host IP or run the listener inside Docker.
+  - If the probe fails, confirm Docker Desktop is running and ensure `host.docker.internal` resolves. On Linux the host IP may need to be used or the listener run inside Docker.
 
 - `Address already in use` when starting the listener:
   - Find and stop the process using the port: `lsof -nP -iTCP:8080 -sTCP:LISTEN`
   - Or start the listener on another port and re-run the setup wrapper with that port: `infra/file_processing/scripts/setup_localstack.sh host.docker.internal 8090` and `packages/file_processing/scripts/run_local_listener.sh 8090`.
 
-- If you see TLS/hostname mismatch warnings, the setup script already uses `--no-verify-ssl` for LocalStack HTTPS; to avoid disabling verification, use the `LOCALSTACK_HOSTNAME` approach described above.
+- If TLS/hostname mismatch warnings appear, the setup script uses `--no-verify-ssl` for LocalStack HTTPS; to avoid disabling verification, map a LocalStack hostname (for example `localhost.localstack.cloud`) to `127.0.0.1` and set `LOCALSTACK_HOSTNAME` so cert SANs match.
 
 Per‑perspective wrappers
 
@@ -517,86 +517,5 @@ Notes and best practices
 
 ## Troubleshooting
 
-- "ModuleNotFoundError: No module named 'file_processing'" in containers: ensure `PYTHONPATH=/app/packages` and that the container image was built from repo root so `packages/` were copied into the image.
+- "ModuleNotFoundError: No module named 'file_processing'" in containers: verify `PYTHONPATH=/app/packages` and ensure the container image was built from repo root so `packages/` were copied into the image.
 - If SNS delivery fails, check Access Logs on the ALB/Ingress and the listener logs for subscription confirmation errors.
-- For database connectivity, ensure the RDS security group allows inbound traffic from the cluster's VPC / nodes or the bastion host.
-
----
-
-## Local database for development (Postgres)
-
-The SNS -> listener -> job flow requires a Postgres database for lookups and run metadata. For local development you can run a lightweight Postgres container and point the listener/job at it.
-
-1) Start a local Postgres container
-
-```bash
-# run Postgres 14 on local port 5432 with username/password 'postgres'
-docker run --name local-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=postgres -p 5432:5432 -d postgres:14
-```
-
-2) Export DB environment variables (listener process reads these when connecting)
-
-```bash
-# Option A: use DATABASE_URL
-export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"
-
-# Option B: use DB_* env vars (the DatabaseClient falls back to these)
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=postgres
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-```
-
-3) Verify you can connect (quick Python check)
-
-```bash
-python - <<'PY'
-import os
-import psycopg2
-print('DATABASE_URL=', os.getenv('DATABASE_URL'))
-conn = psycopg2.connect(os.getenv('DATABASE_URL'))
-print('Connected OK, version:', conn.server_version)
-conn.close()
-PY
-```
-
-If you prefer `psql`:
-
-```bash
-# Install psql client if needed (macOS: `brew install libpq` then `brew link --force libpq`)
-psql "postgresql://postgres:postgres@localhost:5432/postgres" -c 'select version();'
-```
-
-4) Start the SNS listener with the DB env in the same terminal (so the process sees the variables):
-
-```bash
-# With DATABASE_URL exported above
-packages/file_processing/scripts/run_local_listener.sh 8080
-
-# or directly (ensures variables are exported in the command environment)
-DB_HOST=localhost DB_PORT=5432 DB_NAME=postgres DB_USER=postgres DB_PASSWORD=postgres packages/file_processing/scripts/run_local_listener.sh 8080
-```
-
-5) Re-publish the test SNS message (LocalStack -> listener -> job)
-
-```bash
-EDGE="https://localhost:4566"
-TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:file-processing-topic"
-aws --no-verify-ssl --endpoint-url "$EDGE" --region us-east-1 sns publish \
-  --topic-arn "$TOPIC_ARN" \
-  --message '{"Records":[{"s3":{"bucket":{"name":"etl-file-processing-client-etl"},"object":{"key":"from_client/nm_albuquerque/organizations/Officer_Detail.csv"}}}]}'
-```
-
-6) Notes on schema and test data
-
-- The real job expects application-specific tables (monitoring files, runs, mappings). Running a plain Postgres instance will allow the job to connect, but the job may still fail if expected rows are missing.
-- For full local parity, load a DB dump from your dev environment or run the project's migration/data seed if available. If you don't have a dump, run the job in `--dry-run` or use the unit tests' fixtures to exercise behavior.
-
-7) Quick cleanup
-
-```bash
-docker stop local-postgres && docker rm local-postgres
-```
-
-This local Postgres approach is intended for development and debugging only. For production, use the `infra/postgres_on_demand` Terraform module or your managed RDS instance and ensure the `DATABASE_URL` (or DB_* env vars) are set in the Kubernetes Deployment/Secret so the pods can authenticate successfully.

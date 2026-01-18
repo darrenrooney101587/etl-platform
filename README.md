@@ -34,21 +34,21 @@ Packaging & dependencies
 
 Container images & local compose
 
-- We build separate container images per package. Dockerfiles live under `docker/` or inside package folders where noted.
-- A `compose/` folder provides a simple local development composition (see `compose/README.md`).
+- Separate container images are produced per package. Dockerfiles live under `docker/` or inside package folders where noted.
+- The `compose/` folder provides a local development composition (see `compose/README.md`).
 
 Airflow control plane (high level)
 
-This repository contains an Airflow "control plane" component that generates and distributes DAGs for package-level jobs. The project follows a modular deployment model: packages are deployable independently and run their job code inside their own container images.
+This repository includes an Airflow "control plane" component that generates and distributes DAGs for package-level jobs. The project follows a modular deployment model: packages are deployable independently and execute their job code inside their own container images.
 
 Key principles (summary)
-- DAGs are treated as deployment artifacts and must be generated and published by the owning package's CI pipeline.
+- DAGs are treated as deployment artifacts generated and published by the owning package's CI pipeline.
 - The running Airflow Scheduler/Webserver remain long-lived and discover DAGs from a shared DAG location — no control-plane image rebuild is required when packages add jobs.
-- Generated DAGs must reference package container images (KubernetesPodOperator) so runtime execution is isolated from the scheduler.
+- Generated DAGs reference package container images (KubernetesPodOperator) so runtime execution is isolated from the scheduler.
 
 DAG distribution contract (canonical layout)
 
-Packages must publish DAG artifacts to a shared S3 bucket using the following layout:
+Packages publish DAG artifacts to a shared S3 bucket using the following layout:
 
 s3://<dag-bucket>/<env>/<package_name>/
 ├── dags/
@@ -63,7 +63,7 @@ Rules and guardrails
 
 CI integration (package responsibility)
 
-Each package CI should:
+Each package CI pipeline should:
 - Build/package the image for the package (IMAGE_TAG).
 - Run a DAG generator (or template) that emits deterministic DAG files.
 - Upload DAG files to `s3://<dag-bucket>/<env>/<package_name>/dags/` and any optional `metadata.json`.
@@ -94,22 +94,22 @@ DAG authoring pattern (reference)
 
 Operational notes
 
-- If DAG upload fails: CI should fail the pipeline and alert; Airflow will continue running existing DAGs.
-- Malformed DAGs: keep DAG files small and validate syntax in CI before upload to avoid breaking the scheduler parse cycle.
+- On DAG upload failure: package CI should fail the pipeline and alert; Airflow continues running existing DAGs.
+- Malformed DAGs: DAG files must be validated in CI to avoid breaking the scheduler parse cycle.
 - Blast radius: store each package's DAGs under its own prefix to allow per-package rollback and isolation.
-- Rollback: CI should support removing or replacing DAG files (e.g., upload previous DAG artifact) and optionally trigger Airflow REST API to unpause or trigger a smoke run.
+- Rollback: package CI should support removing or replacing DAG files (for example, upload a previous DAG artifact) and optionally call the Airflow REST API to unpause or trigger a smoke run.
 
 Where to find more details
 - Full control-plane design and operational details: `AIRFLOW_CONTROL_PLANE_SUMMARY.md` (in repo root).
 - Airflow infra manifests and deployment notes: `infra/airflow_control_plane/README.md` and `docs/airflow/DEPLOYMENT.md`.
-- Per-package CI examples and DAG generator templates: look at `packages/<package>/` README and CI config in each package.
+- Per-package CI examples and DAG generator templates: see `packages/<package>/` README and CI config in each package.
 
 Contributing and developer workflow
 
-- Add jobs under your package following the package's README and job conventions.
-- Validate DAG generation and upload in your package CI; do not rely on pushing changes to the control-plane image.
-- For local development use `compose/` and package-level scripts — the compose setup may mount sources for faster iteration.
+- Jobs should be added under the owning package following the package's README and job conventions.
+- Package CI must validate DAG generation and upload; control-plane image rebuilds must not be relied upon for DAG discovery.
+- For local development, the `compose/` setup can mount sources for faster iteration.
 
 License & governance
 
-See the repository root for license and contributor guidelines.
+Repository-level license and contributor guidelines are available at the repository root.

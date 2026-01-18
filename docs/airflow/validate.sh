@@ -54,18 +54,18 @@ done
 echo ""
 
 # Check 2: DAG publisher package
-echo "Checking airflow_dag_publisher package..."
+echo "Checking orchestration package..."
 required_publisher_files=(
-    "packages/airflow_dag_publisher/README.md"
-    "packages/airflow_dag_publisher/pyproject.toml"
-    "packages/airflow_dag_publisher/__init__.py"
-    "packages/airflow_dag_publisher/publisher.py"
-    "packages/airflow_dag_publisher/validators.py"
-    "packages/airflow_dag_publisher/generator.py"
-    "packages/airflow_dag_publisher/cli/main.py"
-    "packages/airflow_dag_publisher/templates/kubernetes_pod_dag.py.j2"
-    "packages/airflow_dag_publisher/tests/test_publisher.py"
-    "packages/airflow_dag_publisher/tests/test_validators.py"
+    "packages/orchestration/README.md"
+    "packages/orchestration/pyproject.toml"
+    "packages/orchestration/__init__.py"
+    "packages/orchestration/publisher.py"
+    "packages/orchestration/validators.py"
+    "packages/orchestration/generator.py"
+    "packages/orchestration/cli/main.py"
+    "packages/orchestration/templates/kubernetes_pod_dag.py.j2"
+    "packages/orchestration/tests/test_publisher.py"
+    "packages/orchestration/tests/test_validators.py"
 )
 
 for file in "${required_publisher_files[@]}"; do
@@ -123,10 +123,10 @@ echo ""
 # Check 6: Python syntax
 echo "Validating Python syntax..."
 python_files=(
-    "packages/airflow_dag_publisher/publisher.py"
-    "packages/airflow_dag_publisher/validators.py"
-    "packages/airflow_dag_publisher/generator.py"
-    "packages/airflow_dag_publisher/cli/main.py"
+    "packages/orchestration/publisher.py"
+    "packages/orchestration/validators.py"
+    "packages/orchestration/generator.py"
+    "packages/orchestration/cli/main.py"
     "packages/data_pipeline/airflow_dags/data_pipeline_example_job.py"
     "packages/reporting_seeder/airflow_dags/reporting_seeder_refresh_all.py"
 )

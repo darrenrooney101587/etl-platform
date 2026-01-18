@@ -1,4 +1,4 @@
-# reporting_seeder infra
+fe# reporting_seeder infra
 
 This stack provisions infrastructure for `reporting_seeder`, pulling shared VPC/subnet outputs from `infra/plumbing`.
 
@@ -28,7 +28,9 @@ docker run --rm -e PYTHONUNBUFFERED=1 reporting-seeder:local \
   python -m reporting_seeder.cli.main
 ```
 
-If you need DB connectivity locally, provide a `DATABASE_URL` (or the envs expected by the package settings):
+Local DB connectivity
+
+To provide DB connectivity to the container, set a `DATABASE_URL` (or the envs expected by the package settings):
 ```bash
 docker run --rm \
   -e PYTHONUNBUFFERED=1 \
@@ -49,12 +51,12 @@ cd infra/reporting_seeder
 ./scripts/setup_localstack.sh host.docker.internal 8080
 ```
 
-This will:
-- start LocalStack (if needed)
-- create a perspective-specific S3 bucket and SNS topic
-- subscribe an HTTP endpoint to the SNS topic
+Behavior:
+- Starts LocalStack (if needed)
+- Creates a perspective-specific S3 bucket and SNS topic
+- Subscribes an HTTP endpoint to the SNS topic
 
-If reporting_seeder doesnt need SNS/S3 locally, you can ignore the created resources; the wrapper is here for repo-wide consistency.
+The LocalStack wrapper is optional; when SNS/S3 local emulation is not required the created resources can be ignored. The wrapper exists for repo-wide consistency.
 
 ## C) Push to `etl-playground` (AWS testing)
 

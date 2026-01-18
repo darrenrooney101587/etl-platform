@@ -24,7 +24,7 @@ This document summarizes the complete implementation of the S3-based Airflow DAG
 - `deploy_airflow.sh`: Helm install/upgrade/status/logs
 - `setup_localstack.sh`: Local testing with LocalStack
 
-### 2. DAG Publisher Package (packages/airflow_dag_publisher/)
+### 2. DAG Publisher Package (packages/orchestration/)
 
 **Core Modules**
 - `publisher.py`: S3 upload with safety guardrails
@@ -80,7 +80,7 @@ airflow-dag-publisher list       # List published DAGs
 - `OPERATIONS.md`: Operational procedures, debugging, failure modes
 
 **Package Documentation**
-- `packages/airflow_dag_publisher/README.md`: CLI usage guide
+- `packages/orchestration/README.md`: CLI usage guide
 
 ## Key Design Decisions
 
@@ -246,7 +246,7 @@ infra/airflow/
 
 ### DAG Publisher (11 files)
 ```
-packages/airflow_dag_publisher/
+packages/orchestration/
 ├── README.md
 ├── pyproject.toml
 ├── __init__.py

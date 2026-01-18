@@ -19,8 +19,8 @@ module "on_demand_postgres" {
 
 Quick steps:
 
-1. Ensure your AWS credentials are configured in the environment (profile or env vars).
-2. From the repository root run Terraform against the `terraform` subdirectory for this stack:
+1. AWS credentials must be configured in the environment (profile or env vars).
+2. From the repository root Terraform can be run against the `terraform` subdirectory for this stack:
 
 ```bash
 # option A: use -chdir
@@ -37,6 +37,6 @@ terraform apply -auto-approve
 
 Notes and warnings:
 
-- This module is intentionally opinionated to be simple: it can create a minimal VPC and subnets if you don't provide an existing VPC/subnets.
-- It is designed for **ad-hoc** use; it sets `skip_final_snapshot = true` and `deletion_protection = false` for convenience. Be cautious when using in production.
-- The RDS instance is created with `engine_version = "15.4"` (Postgres 15). You can change this in `main.tf` if you need a specific minor version.
+- This module is intentionally opinionated to be simple: it can create a minimal VPC and subnets if an existing VPC/subnets are not provided.
+- It is designed for **ad-hoc** use; it sets `skip_final_snapshot = true` and `deletion_protection = false` for convenience. Exercise caution when using in production.
+- The RDS instance is created with `engine_version = "15.4"` (Postgres 15). This value can be modified in `main.tf` to select a different minor version.

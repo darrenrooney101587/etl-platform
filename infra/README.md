@@ -9,8 +9,8 @@ Goals
 - Make local development reproducible via `infra/local/` helpers (LocalStack, local Docker, helper scripts).
 
 Top-level layout (convention)
-- `infra/plumbing/` or `infra/foundation_network/` — foundational stacks that must be applied once per environment. Examples: shared VPC, subnets, NAT/IGW, DNS, central ECR, logging and monitoring sinks.
-- `infra/<module>/` — per-module terraform + k8s manifests + helper scripts. Each package that is deployable should have a matching infra folder (for example: `infra/file_processing/`, `infra/data_pipeline/`, `infra/reporting_seeder/`).
+- `infra/plumbing/` or `infra/foundation_network/` — foundational stacks applied once per environment. Examples: shared VPC, subnets, NAT/IGW, DNS, central ECR, logging and monitoring sinks.
+- `infra/<module>/` — per-module terraform + k8s manifests + helper scripts. Each package that is deployable has a matching infra folder (for example: `infra/file_processing/`, `infra/data_pipeline/`, `infra/reporting_seeder/`).
   - `scripts/` — terraform lifecycle helpers: `manage.sh`, `ecr_put.sh`, `setup_localstack.sh` (module-specific wrapper). These are required by convention.
   - `terraform/` — module terraform code (state backends, providers configured to consume foundation outputs).
   - `k8s/` — Kubernetes manifests or helm charts for the module's runtime resources.
@@ -22,30 +22,30 @@ Why per-module infra?
 - Reproducibility: infra for a module is versioned alongside the package implementation and CI pipeline that builds the package image.
 
 Foundation-first rule
-- The foundational networking stack under `infra/plumbing/` (foundation network, shared services) should be applied once per environment before any per-module stacks. Per-module stacks expect these outputs to be available and wired into their Terraform inputs.
+- The foundational networking stack under `infra/plumbing/` (foundation network, shared services) is applied once per environment before per-module stacks. Per-module stacks depend on the foundation outputs and expect them to be provided as Terraform inputs or CI-injected variables.
 
 Shared resources and the "shared directory"
 - Some resources are inherently shared (VPCs, NAT, DNS, central ECR, logging/monitoring). These live under `infra/plumbing/`.
-- Outputs from the foundation stack are the inputs for per-module stacks. Use an explicit mechanism to pass outputs (terraform remote state outputs, exported artifacts, or CI-injected variables).
-- The repo may include a `infra/shared/` or `infra/plumbing/outputs/` helper that documents or centralizes expected outputs — but the canonical ground-truth is the applied Terraform state (remote state bucket).
+- Outputs from the foundation stack are the inputs for per-module stacks. An explicit mechanism should be used to pass outputs (terraform remote state outputs, exported artifacts, or CI-injected variables).
+- The repo may include a `infra/shared/` or `infra/plumbing/outputs/` helper that documents or centralizes expected outputs — the canonical ground-truth remains the applied Terraform state (remote state bucket).
 
 Safety & governance patterns
 - Do not reference other modules' terraform state directly in code — consume explicit outputs only.
-- Avoid copying another module's terraform into your module; instead add a clear dependency on foundation outputs.
+- Avoid copying another module's terraform into a module; instead add a clear dependency on foundation outputs.
 - Keep secrets out of terraform modules in plaintext. Use secrets managers (Secrets Manager, SSM Parameter Store) and inject via CI/terraform remote state variables or Kubernetes Secrets.
 
 Local development (`infra/local/`)
-- Purpose: fast iteration loop when you don't have an EKS cluster or remote AWS resources available.
+- Purpose: fast iteration loop when an EKS cluster or remote AWS resources are not available.
 - Typical contents:
   - LocalStack helpers to emulate S3, ECR, SQS, etc.
   - Docker-compose and example env files that mirror production environment variables (but do not contain secrets).
   - Seed data used for local tests and previews.
 - Conventions:
-  - `infra/local/scripts/setup_localstack.sh` should be the canonical entrypoint for local environment setup.
+  - `infra/local/scripts/setup_localstack.sh` is the canonical entrypoint for local environment setup.
   - Local infra scripts should be idempotent and safe to run repeatedly.
 
 packages/ ↔ infra/ relationship
-- One-to-one by intention: for each deployable package under `packages/<name>/` there should be a corresponding `infra/<name>/` that knows how to deploy that package's runtime resources.
+- One-to-one by intention: for each deployable package under `packages/<name>/` there is a corresponding `infra/<name>/` that knows how to deploy that package's runtime resources.
 - Responsibilities:
   - Package (`packages/<name>/`) owns code, image build, DAG generation (if applicable), and package-level CI.
   - Infra (`infra/<name>/`) owns Terraform, k8s manifests, service accounts, and any infra-level CI steps (e.g., ECR push hooks, image promotion scripts).
@@ -59,7 +59,7 @@ Shared deployment artifacts
 - Document the artifact contract (naming conventions, prefixes, ACLs) in `infra/README.md` or the relevant infra module.
 
 Operational notes
-- Terraform state: store remote backend state (S3 + DynamoDB for locks) per module to avoid accidental state collisions. Foundation stack should have its own state and not be mixed with per-module state.
+- Terraform state: store remote backend state (S3 + DynamoDB for locks) per module to avoid accidental state collisions. Foundation stack has its own state and is not mixed with per-module state.
 - Rollouts: use blue/green or canary patterns where appropriate. Document the expected rollout strategy in the module's `infra/<module>/README.md`.
 - Observability: platform-level logging, metrics, and tracing should be wired from the foundation stack so per-module stacks can rely on the same collector endpoints.
 

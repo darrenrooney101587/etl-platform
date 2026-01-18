@@ -80,7 +80,7 @@ Key behaviors:
   - Env vars:
     - `CIRCUIT_BREAKER_MAX_FAILURES` (default `5`) — consecutive failing jobs before the breaker activates.
     - `CIRCUIT_BREAKER_COOLDOWN_SECONDS` (default `60`) — how long to wait before the breaker auto-resets.
-  - While active the handler will skip submitting new jobs and respond with `{"status": "skipped"}`. You can change this behavior to return a 5xx if you prefer SNS to retry automatically.
+  - While active the handler will skip submitting new jobs and respond with `{"status": "skipped"}`. An alternate behavior is to return a 5xx response so SNS will retry automatically.
   - The circuit breaker is per-pod (in-memory). Restarting the pod will reset the breaker.
 
 ## Jobs
@@ -113,7 +113,7 @@ We include tests that cover the `CircuitBreaker` behavior and the S3 `NoSuchKey`
 git clone git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git ../etl-database-schema
 ```
 
-2) Ensure you have a local env file:
+2) A local env file is required:
 ```bash
 cp packages/file_processing/.env.example packages/file_processing/.env
 ```
@@ -123,7 +123,7 @@ cp packages/file_processing/.env.example packages/file_processing/.env
 ./packages/file_processing/scripts/build.sh
 ```
 
-When `etl-database-schema` changes, run `git pull` in `../etl-database-schema` and rebuild:
+When `etl-database-schema` is updated, pull changes in the sibling checkout and rebuild the image:
 ```bash
 cd ../etl-database-schema && git pull
 cd -

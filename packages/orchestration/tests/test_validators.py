@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from airflow_dag_publisher.validators import DAGValidator, DAGValidationError
+from orchestration.validators import DAGValidator, DAGValidationError
 
 
 class TestDAGValidator(unittest.TestCase):

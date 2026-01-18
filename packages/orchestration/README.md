@@ -14,7 +14,7 @@ This package provides utilities for:
 ## Installation
 
 ```bash
-cd packages/airflow_dag_publisher
+cd packages/orchestration
 poetry install
 ```
 
@@ -197,7 +197,7 @@ publish_dags:
   image: python:3.10-slim
   before_script:
     - pip install poetry
-    - cd packages/airflow_dag_publisher
+    - cd packages/orchestration
     - poetry install
     - cd ../..
   script:
@@ -224,7 +224,7 @@ The publisher respects standard AWS environment variables:
 
 ### "Bucket does not exist"
 
-Ensure the S3 bucket exists and you have read permissions:
+Ensure the S3 bucket exists and the running identity has read permissions:
 
 ```bash
 aws s3 ls s3://<bucket>/
@@ -266,20 +266,20 @@ dag_id="<package_name>_<dag_name>"
 ### Run Tests
 
 ```bash
-cd packages/airflow_dag_publisher
+cd packages/orchestration
 poetry run pytest
 ```
 
 ### Type Checking
 
 ```bash
-poetry run mypy airflow_dag_publisher
+poetry run mypy orchestration
 ```
 
 ### Code Formatting
 
 ```bash
-poetry run black airflow_dag_publisher
+poetry run black orchestration
 ```
 
 ## Architecture

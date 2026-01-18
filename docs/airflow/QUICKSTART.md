@@ -1,20 +1,20 @@
 # Airflow DAG Quick Start Guide
 
-A quick reference for adding Airflow orchestration to your package.
+A quick reference for adding Airflow orchestration to a package.
 
-## For Package Developers
+## Package developers
 
-### 1. Create Your DAG Directory
+### 1. Create the DAG directory
 
 ```bash
 mkdir -p packages/<your_package>/airflow_dags
 ```
 
-### 2. Write Your DAG
+### 2. Write the DAG
 
 Create `packages/<your_package>/airflow_dags/<your_package>_<job_name>.py`:
 
-```python
+```text
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
@@ -64,9 +64,9 @@ with DAG(
     )
 ```
 
-### 3. Add CI Stage
+### 3. Add CI stage
 
-Add to your `.gitlab-ci.yml`:
+A CI stage that validates and publishes DAGs can be added to package CI. Example inclusion using a shared template:
 
 ```yaml
 include:
@@ -76,8 +76,6 @@ stages:
   - test
   - build
   - deploy
-
-# ... your existing stages ...
 
 publish_dags_dev:
   extends: .dag_publish_template
@@ -92,9 +90,9 @@ publish_dags_dev:
     - main
 ```
 
-### 4. Configure CI Variables
+### 4. Configure CI variables
 
-Add to GitLab project (Settings → CI/CD → Variables):
+CI/CD variables required for DAG publishing and AWS access:
 
 - `DAG_BUCKET_DEV`: `etl-airflow-dags-dev`
 - `AWS_ACCESS_KEY_ID`: (from IAM)
@@ -102,25 +100,27 @@ Add to GitLab project (Settings → CI/CD → Variables):
 
 ### 5. Deploy
 
+Example Git workflow for publishing DAGs from the package repository:
+
 ```bash
 git add packages/<your_package>/airflow_dags
 git commit -m "Add Airflow DAG for <job_name>"
 git push origin main
 ```
 
-Wait 60 seconds, then check Airflow UI for your DAG!
+Allow 60 seconds for sync and parse; then check the Airflow UI for the DAG.
 
 ## Common Patterns
 
 ### Daily Schedule at Specific Time
 
-```python
+```text
 schedule_interval="0 2 * * *"  # 2 AM daily
 ```
 
 ### Multiple Tasks in Sequence
 
-```python
+```text
 with DAG(...) as dag:
     task1 = KubernetesPodOperator(...)
     task2 = KubernetesPodOperator(...)
@@ -131,7 +131,7 @@ with DAG(...) as dag:
 
 ### Multiple Tasks in Parallel
 
-```python
+```text
 with DAG(...) as dag:
     task1 = KubernetesPodOperator(...)
     task2 = KubernetesPodOperator(...)
@@ -142,7 +142,7 @@ with DAG(...) as dag:
 
 ### Pass Arguments to Job
 
-```python
+```text
 run_job = KubernetesPodOperator(
     task_id="run_job",
     arguments=["run", "my_job", "--arg1", "value1", "--arg2", "value2"],
@@ -152,7 +152,7 @@ run_job = KubernetesPodOperator(
 
 ### Environment Variables
 
-```python
+```text
 run_job = KubernetesPodOperator(
     task_id="run_job",
     env_vars={
@@ -166,7 +166,7 @@ run_job = KubernetesPodOperator(
 
 ### Resource Limits
 
-```python
+```text
 # Small job
 container_resources=k8s.V1ResourceRequirements(
     requests={"cpu": "250m", "memory": "256Mi"},
@@ -182,7 +182,7 @@ container_resources=k8s.V1ResourceRequirements(
 
 ### Email Alerts
 
-```python
+```text
 default_args = {
     "owner": "my_team",
     "email": ["team@example.com"],
@@ -196,7 +196,7 @@ default_args = {
 ### Generate a DAG
 
 ```bash
-cd packages/airflow_dag_publisher
+cd packages/orchestration
 poetry install
 
 poetry run airflow-dag-publisher generate \
@@ -229,8 +229,8 @@ poetry run airflow-dag-publisher publish \
 
 ### DAG Not Appearing
 
-1. Wait 60 seconds (sync + parse time)
-2. Check GitLab CI logs for publish errors
+1. Allow 60 seconds (sync + parse time)
+2. Check CI logs for publish errors
 3. Check Airflow scheduler logs: `kubectl logs -n airflow -l component=scheduler`
 4. Verify S3: `aws s3 ls s3://etl-airflow-dags-dev/dev/<your_package>/dags/`
 
@@ -238,14 +238,14 @@ poetry run airflow-dag-publisher publish \
 
 1. Check Airflow UI error message
 2. Validate syntax: `python <dag_file>.py`
-3. Fix errors and re-push
+3. Fix errors and re-publish
 
 ### Job Pod Won't Start
 
-1. Check pod: `kubectl get pods -n etl-jobs -l dag_id=<dag_id>`
+1. Inspect pod: `kubectl get pods -n etl-jobs -l dag_id=<dag_id>`
 2. Describe pod: `kubectl describe pod -n etl-jobs <pod-name>`
-3. Check image exists in ECR
-4. Verify resource limits aren't too high
+3. Confirm image exists in ECR
+4. Verify resource limits are appropriate
 
 ## Best Practices
 
@@ -267,7 +267,7 @@ poetry run airflow-dag-publisher publish \
 - [Deployment Guide](DEPLOYMENT.md)
 - [Operations Guide](OPERATIONS.md)
 - [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
-- [DAG Publisher README](../../packages/airflow_dag_publisher/README.md)
+- [DAG Publisher README](../../packages/orchestration/README.md)
 
 ## Getting Help
 

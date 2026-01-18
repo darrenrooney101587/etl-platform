@@ -7,9 +7,9 @@ import os
 import sys
 from pathlib import Path
 
-from airflow_dag_publisher.generator import DAGGenerator
-from airflow_dag_publisher.publisher import DAGPublisher
-from airflow_dag_publisher.validators import DAGValidator
+from orchestration.generator import DAGGenerator
+from orchestration.publisher import DAGPublisher
+from orchestration.validators import DAGValidator
 
 
 logging.basicConfig(

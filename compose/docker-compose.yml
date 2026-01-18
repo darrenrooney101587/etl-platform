@@ -25,3 +25,15 @@ services:
     volumes:
       - ../packages/observability:/app/packages/observability
       - ../packages/etl_core:/app/packages/etl_core
+
+  airflow-control-plane:
+    image: etl-airflow-control-plane
+    build:
+      context: ../
+      dockerfile: ../packages/airflow_control_plane/airflow-control-plane.Dockerfile
+    volumes:
+      - ../packages/airflow_control_plane:/app/packages/airflow_control_plane
+      - ../packages/etl_core:/app/packages/etl_core
+    # Optional: expose webserver port on a different host port to avoid conflicts with other services
+    # ports:
+    #   - "8081:8080"

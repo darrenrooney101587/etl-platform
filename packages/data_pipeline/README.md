@@ -73,8 +73,7 @@ docker run --rm -it \
   poetry run data-pipeline-get-s3-files --agency-id 10
 ```
 
-Set environment variable `SKIP_INSTALL=1` when you are sure dependencies are present and you want to skip the install
-step.
+Set environment variable `SKIP_INSTALL=1` when dependencies are already present and the install step should be skipped.
 
 Kubernetes Job example (EKS)
 
@@ -110,9 +109,8 @@ Avoid `docker exec` for jobs
   and aligns with K8s semantics.
 
 Running the module directly
-
-- If you need to run without an installed console script, you can run the module
-  with Python: `python -m data_pipeline.cli.get_s3_files --help`.
+- If there is a need to run without an installed console script, the module
+  can be run with Python: `python -m data_pipeline.cli.get_s3_files --help`.
 
 ## How to run locally
 
@@ -219,7 +217,7 @@ spec:
       backoffLimit: 1
 ```
 
-- Parallelism / batching: if you need to process many agencies concurrently, create a controller/job-generator that
+- Parallelism / batching: if concurrent processing of many agencies is required, create a controller/job-generator that
   submits many Job objects, or use a single Job with a scatter step that enqueues work to a queue system (SQS, Pub/Sub)
   and have workers scale.
 
@@ -249,7 +247,7 @@ spec:
 
 ## Jobs vs Processors — conceptual separation
 
-When developing in `packages/data_pipeline` you'll see two primary abstractions: "jobs" and "processors". Keep the distinction clear — it improves testability, ownership, and scale.
+When developing in `packages/data_pipeline`, two primary abstractions are used: "jobs" and "processors". Keeping the distinction clear improves testability, ownership, and scale.
 
 - Job (location: `packages/data_pipeline/jobs`)
   - Purpose: orchestration and operational concerns. A job wires together configuration, repositories, processors, and adapters; it parses CLI args, composes resources, and maps results to exit codes and human-friendly output.
@@ -275,19 +273,19 @@ When developing in `packages/data_pipeline` you'll see two primary abstractions:
     - Given a list of file mappings, perform copies and return a list of per-file results.
     - Given an agency id, fetch employment history rows and format them as CSV-ready dicts.
 
-Why this separation helps
+- Why this separation helps
 
-- Testability: processors are easy to unit test by injecting fake S3/DB clients; jobs can be tested by injecting fake processors and repositories.
-- Ownership: domain SQL and data-shaping lives in package-level repositories (e.g. `packages/data_pipeline/repositories`) instead of `etl_core` (which stays generic).
-- Reuse: processors implement mechanics once and are used by many jobs (reduces duplication).
-- Operations: Jobs remain thin and focus on logging, retries policy, and mapping to orchestration systems (K8s exit codes, metrics), making them safer to run at scale.
+  - Testability: processors are easy to unit test by injecting fake S3/DB clients; jobs can be tested by injecting fake processors and repositories.
+  - Ownership: domain SQL and data-shaping lives in package-level repositories (e.g. `packages/data_pipeline/repositories`) instead of `etl_core` (which stays generic).
+  - Reuse: processors implement mechanics once and are used by many jobs (reduces duplication).
+  - Operations: Jobs remain thin and focus on logging, retries policy, and mapping to orchestration systems (K8s exit codes, metrics), making them safer to run at scale.
 
-Contract (how to design a processor)
+- Contract (how to design a processor)
 
-- Inputs: simple typed values or dataclasses (e.g. `S3Config`, `EmploymentHistoryConfig`) and dependency objects (clients/adapters).
-- Outputs: plain Python types (dicts, lists) describing results or summaries. Avoid returning framework-specific types.
-- Error handling: processors should raise exceptions for unexpected failures and return structured result dicts for expected outcomes (for example a per-file status row). Jobs should catch exceptions and decide whether to retry, warn, or fail the whole job.
-- Idempotency: where possible, make processor operations idempotent (so retries are safe).
+  - Inputs: simple typed values or dataclasses (e.g. `S3Config`, `EmploymentHistoryConfig`) and dependency objects (clients/adapters).
+  - Outputs: plain Python types (dicts, lists) describing results or summaries. Avoid returning framework-specific types.
+  - Error handling: processors should raise exceptions for unexpected failures and return structured result dicts for expected outcomes (for example a per-file status row). Jobs should catch exceptions and decide whether to retry, warn, or fail the whole job.
+  - Idempotency: where possible, make processor operations idempotent (so retries are safe).
 
 Edge cases to consider
 
