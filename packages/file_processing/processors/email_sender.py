@@ -91,17 +91,14 @@ class EmailSender:
         Raises:
             RuntimeError: If email sending fails.
         """
-        # Use default recipient if none provided
         if not to_addresses:
             to_addresses = [self._config.default_recipient]
 
-        # Validate SMTP configuration
         if not self._config.smtp_password:
             raise RuntimeError(
                 "SMTP password not configured. Set SMTP_PASSWORD or SENDGRID_API_KEY environment variable."
             )
 
-        # Generate default body if not provided
         if body_text is None:
             body_text = (
                 "Please find attached the data quality report.\n\n"
@@ -118,25 +115,20 @@ class EmailSender:
         )
 
         try:
-            # Create multipart message
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = f"{self._config.from_name} <{self._config.from_address}>"
             msg["To"] = ", ".join(to_addresses)
 
-            # Attach plain text body
             msg.attach(MIMEText(body_text, "plain"))
 
-            # Attach HTML body if provided
             if body_html:
                 msg.attach(MIMEText(body_html, "html"))
 
-            # Attach files if provided
             if attachment_paths:
                 for file_path in attachment_paths:
                     self._attach_file(msg, file_path)
 
-            # Send via SMTP
             with smtplib.SMTP(self._config.smtp_host, self._config.smtp_port) as server:
                 server.starttls()
                 server.login(self._config.smtp_user, self._config.smtp_password)
@@ -167,7 +159,6 @@ class EmailSender:
         with open(path, "rb") as f:
             file_data = f.read()
 
-        # Determine MIME subtype based on file extension
         if path.suffix.lower() == ".pdf":
             mime_subtype = "pdf"
         else:
