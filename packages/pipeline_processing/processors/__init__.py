@@ -2,7 +2,24 @@
 from importlib import import_module
 from typing import Any
 
-__all__ = ["S3FileProcessor"]
+from pipeline_processing.processors.s3_data_quality_processor import (
+    S3DataQualityProcessor,
+    S3DataQualityProcessorConfig,
+)
+from pipeline_processing.processors.profiler import DataProfiler
+from pipeline_processing.processors.pdf_generator import PDFGenerator, PDFGeneratorConfig
+from pipeline_processing.processors.email_sender import EmailSender, EmailSenderConfig
+
+__all__ = [
+    "S3FileProcessor",
+    "S3DataQualityProcessor",
+    "S3DataQualityProcessorConfig",
+    "DataProfiler",
+    "PDFGenerator",
+    "PDFGeneratorConfig",
+    "EmailSender",
+    "EmailSenderConfig",
+]
 
 
 def __getattr__(name: str) -> Any:
