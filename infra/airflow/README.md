@@ -87,6 +87,65 @@ Then upgrade the release:
 ENVIRONMENT=dev DAG_BUCKET=etl-airflow-dags-dev ./deploy_airflow.sh upgrade
 ```
 
+## Local Development
+
+Use kind or minikube with LocalStack for a local control plane and DAG bucket.
+
+### 1. Start a local Kubernetes cluster
+
+```bash
+kind create cluster
+# or
+minikube start
+```
+
+### 2. Start LocalStack and create the DAG bucket
+
+```bash
+cd infra/airflow/scripts
+ENVIRONMENT=dev ./setup_localstack.sh
+```
+
+This provisions `s3://etl-airflow-dags-dev/dev/` in LocalStack.
+When running against LocalStack instead of AWS (common for kind/minikube), update the DAG sync sidecar command in `k8s/airflow-values.yaml` to pass `--endpoint-url` for the LocalStack endpoint.
+Choose an address reachable from the cluster:
+- Docker Desktop: `http://host.docker.internal:4566`
+- In-cluster LocalStack service: `http://localstack:4566`
+- Docker-based LocalStack on the host: `http://<host-ip>:4566`
+Replace the endpoint in the example below with the address that matches your setup.
+
+```yaml
+command:
+  - /bin/sh
+  - -c
+  - |
+    # ... existing setup ...
+    aws s3 sync "${S3_PREFIX}/" "${LOCAL_DAG_DIR}/" \
+      --delete --exact-timestamps --no-progress \
+      --endpoint-url http://host.docker.internal:4566
+    while true; do
+      # ... existing loop ...
+      aws s3 sync "${S3_PREFIX}/" "${LOCAL_DAG_DIR}/" \
+        --delete --exact-timestamps --no-progress \
+        --endpoint-url http://host.docker.internal:4566
+    done
+```
+
+### 3. Deploy Airflow with Helm
+
+```bash
+cd infra/airflow/scripts
+ENVIRONMENT=dev DAG_BUCKET=etl-airflow-dags-dev ./deploy_airflow.sh install
+```
+
+### 4. Access the Airflow UI
+
+```bash
+kubectl port-forward -n airflow svc/airflow-webserver 8080:80
+```
+
+Open http://localhost:8080.
+
 ## DAG Distribution Flow
 
 1. Package CI generates DAG files

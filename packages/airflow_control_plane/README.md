@@ -2,6 +2,10 @@
 
 This package provides automatic DAG generation and synchronization for ETL jobs across all packages in the platform.
 
+## Deprecation Notice
+
+The canonical Airflow control plane uses S3-based DAG distribution (see `docs/airflow/README.md`, `infra/airflow/`, and `packages/airflow_dag_publisher/`). This package is retained for reference and should not be used for new workflows.
+
 ## Overview
 
 The Airflow control plane solves the problem of keeping Airflow DAGs in sync with ETL jobs. When developers add new jobs to any package (e.g., `data_pipeline`, `file_processing`), the control plane automatically:

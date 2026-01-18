@@ -1,5 +1,9 @@
 # Airflow Control Plane Implementation Summary
 
+## Deprecation Notice
+
+The canonical Airflow control plane uses S3-based DAG distribution (see `docs/airflow/README.md` and `infra/airflow/`). This summary is retained for reference alongside the deprecated control-plane implementation.
+
 ## Overview
 
 This implementation provides an **Airflow control plane** that automatically discovers ETL jobs across all packages and generates Airflow DAGs for them. Developers no longer need to manually create DAG files - they simply follow the existing JOB tuple convention, and their jobs automatically appear in Airflow.

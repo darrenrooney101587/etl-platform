@@ -2,6 +2,10 @@
 
 This directory contains infrastructure-as-code for deploying the Airflow control plane to Kubernetes.
 
+## Deprecation Notice
+
+The canonical Airflow control plane uses S3-based DAG distribution (see `docs/airflow/README.md` and `infra/airflow/`). This directory is retained for reference but should not be used for new deployments.
+
 ## Overview
 
 The Airflow control plane provides automatic DAG generation and synchronization for all ETL jobs in the platform. It consists of:
