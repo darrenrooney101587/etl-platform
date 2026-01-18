@@ -454,7 +454,7 @@ kubectl logs -n etl-jobs <pod-name> -f
 
 1. Recreate bucket with Terraform:
    ```bash
-   cd infra/airflow/scripts
+   cd infra/orchestration/scripts
    ./manage.sh apply
    ```
 

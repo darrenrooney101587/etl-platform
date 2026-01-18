@@ -10,7 +10,7 @@ Goals
 
 Top-level layout (convention)
 - `infra/plumbing/` or `infra/foundation_network/` — foundational stacks applied once per environment. Examples: shared VPC, subnets, NAT/IGW, DNS, central ECR, logging and monitoring sinks.
-- `infra/<module>/` — per-module terraform + k8s manifests + helper scripts. Each package that is deployable has a matching infra folder (for example: `infra/file_processing/`, `infra/data_pipeline/`, `infra/reporting_seeder/`).
+- `infra/<module>/` — per-module terraform + k8s manifests + helper scripts. Each package that is deployable has a matching infra folder (for example: `infra/pipeline_processing/`, `infra/orchestration/`, `infra/reporting_seeder/`).
   - `scripts/` — terraform lifecycle helpers: `manage.sh`, `ecr_put.sh`, `setup_localstack.sh` (module-specific wrapper). These are required by convention.
   - `terraform/` — module terraform code (state backends, providers configured to consume foundation outputs).
   - `k8s/` — Kubernetes manifests or helm charts for the module's runtime resources.

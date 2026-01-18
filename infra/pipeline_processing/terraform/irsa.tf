@@ -1,4 +1,4 @@
-// IRSA (IAM Role for ServiceAccount) resources for file-processing
+// IRSA (IAM Role for ServiceAccount) resources for pipeline-processing
 
 data "aws_partition" "current" {}
 
@@ -18,8 +18,8 @@ locals {
 }
 
 # IAM role for the Kubernetes service account (web identity trust)
-resource "aws_iam_role" "file_processing_sa" {
-  name = "${var.cluster_name}-file-processing-sa"
+resource "aws_iam_role" "pipeline_processing_sa" {
+  name = "${var.cluster_name}-pipeline-processing-sa"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -43,9 +43,9 @@ resource "aws_iam_role" "file_processing_sa" {
 }
 
 # Least-privilege S3 access for reading objects in the bucket
-resource "aws_iam_policy" "file_processing_s3" {
-  name        = "${var.cluster_name}-file-processing-s3"
-  description = "S3 read access for file-processing pods (GetObject + ListBucket)"
+resource "aws_iam_policy" "pipeline_processing_s3" {
+  name        = "${var.cluster_name}-pipeline-processing-s3"
+  description = "S3 read access for pipeline-processing pods (GetObject + ListBucket)"
 
   policy = jsonencode({
     Version = "2012-10-17",
@@ -66,7 +66,7 @@ resource "aws_iam_policy" "file_processing_s3" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "file_processing_s3_attach" {
-  role       = aws_iam_role.file_processing_sa.name
-  policy_arn = aws_iam_policy.file_processing_s3.arn
+resource "aws_iam_role_policy_attachment" "pipeline_processing_s3_attach" {
+  role       = aws_iam_role.pipeline_processing_sa.name
+  policy_arn = aws_iam_policy.pipeline_processing_s3.arn
 }

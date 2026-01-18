@@ -3,7 +3,7 @@ set -euo pipefail
 
 ACCOUNT_ID="${ACCOUNT_ID:-270022076279}"
 BUCKET="${BUCKET:-etl-ba-research-client-etl}"
-TOPIC_ARN="${TOPIC_ARN:-arn:aws-us-gov:sns:us-gov-west-1:${ACCOUNT_ID}:file-processing-topic}"
+TOPIC_ARN="${TOPIC_ARN:-arn:aws-us-gov:sns:us-gov-west-1:${ACCOUNT_ID}:pipeline-processing-topic}"
 AWS_PROFILE="${AWS_PROFILE:-etl-playground}"
 AWS_REGION="${AWS_REGION:-us-gov-west-1}"
 

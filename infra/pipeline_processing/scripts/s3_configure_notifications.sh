@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Configure S3 bucket to publish ObjectCreated events to SNS topic
 BUCKET="${BUCKET:-etl-ba-research-client-etl}"
-TOPIC_ARN="${TOPIC_ARN:-arn:aws-us-gov:sns:us-gov-west-1:270022076279:file-processing-topic}"
+TOPIC_ARN="${TOPIC_ARN:-arn:aws-us-gov:sns:us-gov-west-1:270022076279:pipeline-processing-topic}"
 AWS_PROFILE="${AWS_PROFILE:-etl-playground}"
 AWS_REGION="${AWS_REGION:-us-gov-west-1}"
 

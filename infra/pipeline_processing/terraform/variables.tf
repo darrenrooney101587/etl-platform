@@ -25,13 +25,13 @@ variable "vpc_id" {
 variable "cluster_name" {
   description = "EKS cluster name"
   type        = string
-  default     = "file-processing-cluster"
+  default     = "pipeline-processing-cluster"
 }
 
 variable "node_group_name" {
   description = "EKS managed node group name"
   type        = string
-  default     = "file-processing-nodes"
+  default     = "pipeline-processing-nodes"
 }
 
 variable "node_instance_types" {
@@ -59,9 +59,9 @@ variable "node_max_size" {
 }
 
 variable "sns_topic_name" {
-  description = "SNS topic name for file processing notifications"
+  description = "SNS topic name for pipeline processing notifications"
   type        = string
-  default     = "file-processing-topic"
+  default     = "pipeline-processing-topic"
 }
 
 variable "create_s3_notifications" {
@@ -73,13 +73,13 @@ variable "create_s3_notifications" {
 variable "namespace" {
   description = "Kubernetes namespace to create resources in"
   type        = string
-  default     = "file-processing"
+  default     = "pipeline-processing"
 }
 
 variable "image" {
-  description = "Container image for the file-processing runtime"
+  description = "Container image for the pipeline-processing runtime"
   type        = string
-  default     = "example.com/etl-file-processing:latest"
+  default     = "example.com/etl-pipeline-processing:latest"
 }
 
 variable "replicas" {
@@ -91,7 +91,7 @@ variable "replicas" {
 variable "service_account_name" {
   description = "ServiceAccount name for pods (use IRSA for AWS permissions)"
   type        = string
-  default     = "file-processing-sa"
+  default     = "pipeline-processing-sa"
 }
 
 variable "create_namespace" {

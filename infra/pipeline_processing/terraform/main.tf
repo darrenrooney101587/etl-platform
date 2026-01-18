@@ -1,7 +1,7 @@
 locals {
   common_tags = {
     ManagedBy = "terraform"
-    Component = "file-processing"
+    Component = "pipeline-processing"
   }
 }
 
@@ -150,7 +150,7 @@ data "aws_eks_cluster_auth" "this" {
   depends_on = [aws_eks_node_group.this]
 }
 
-resource "aws_sns_topic" "file_processing" {
+resource "aws_sns_topic" "pipeline_processing" {
   name = var.sns_topic_name
   tags = local.common_tags
 }
@@ -165,7 +165,7 @@ data "aws_iam_policy_document" "sns_topic_policy" {
       identifiers = ["s3.amazonaws.com"]
     }
 
-    resources = [aws_sns_topic.file_processing.arn]
+    resources = [aws_sns_topic.pipeline_processing.arn]
 
     condition {
       test     = "ArnLike"
@@ -176,7 +176,7 @@ data "aws_iam_policy_document" "sns_topic_policy" {
 }
 
 resource "aws_sns_topic_policy" "default" {
-  arn    = aws_sns_topic.file_processing.arn
+  arn    = aws_sns_topic.pipeline_processing.arn
   policy = data.aws_iam_policy_document.sns_topic_policy.json
 }
 
@@ -185,7 +185,7 @@ resource "aws_s3_bucket_notification" "bucket" {
   bucket = var.bucket_name
 
   topic {
-    topic_arn = aws_sns_topic.file_processing.arn
+    topic_arn = aws_sns_topic.pipeline_processing.arn
     events    = ["s3:ObjectCreated:*"]
   }
 
@@ -203,7 +203,7 @@ resource "kubernetes_namespace_v1" "ns" {
 }
 
 # NOTE: The IAM Role for the Kubernetes ServiceAccount and its S3 policy are defined
-# in `irsa.tf` (aws_iam_role.file_processing_sa and aws_iam_role_policy_attachment.file_processing_s3_attach).
+# in `irsa.tf` (aws_iam_role.pipeline_processing_sa and aws_iam_role_policy_attachment.pipeline_processing_s3_attach).
 # We intentionally do not recreate them here to avoid duplicate resource conflicts.
 
 resource "kubernetes_service_account_v1" "sa" {
@@ -213,20 +213,20 @@ resource "kubernetes_service_account_v1" "sa" {
     annotations = merge(
       var.annotations,
       {
-        "eks.amazonaws.com/role-arn" = aws_iam_role.file_processing_sa.arn
+        "eks.amazonaws.com/role-arn" = aws_iam_role.pipeline_processing_sa.arn
       }
     )
   }
 
-  depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.file_processing_s3_attach]
+  depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.pipeline_processing_s3_attach]
 }
 
 resource "kubernetes_deployment_v1" "sns_listener" {
   metadata {
-    name      = "file-processing-sns"
+    name      = "pipeline-processing-sns"
     namespace = var.create_namespace ? kubernetes_namespace_v1.ns[0].metadata[0].name : var.namespace
     labels = {
-      app = "file-processing-sns"
+      app = "pipeline-processing-sns"
     }
   }
 
@@ -234,14 +234,14 @@ resource "kubernetes_deployment_v1" "sns_listener" {
     replicas = var.replicas
     selector {
       match_labels = {
-        app = "file-processing-sns"
+        app = "pipeline-processing-sns"
       }
     }
 
     template {
       metadata {
         labels = {
-          app = "file-processing-sns"
+          app = "pipeline-processing-sns"
         }
       }
 
@@ -290,7 +290,7 @@ resource "kubernetes_deployment_v1" "sns_listener" {
           # IRSA web identity variables so boto3/botocore can pick up credentials
           env {
             name  = "AWS_ROLE_ARN"
-            value = aws_iam_role.file_processing_sa.arn
+            value = aws_iam_role.pipeline_processing_sa.arn
           }
 
           env {
@@ -313,7 +313,7 @@ resource "kubernetes_service_v1" "sns_listener" {
 
   spec {
     selector = {
-      app = "file-processing-sns"
+      app = "pipeline-processing-sns"
     }
 
     port {
@@ -330,7 +330,7 @@ resource "kubernetes_service_v1" "sns_listener" {
 
 resource "aws_sns_topic_subscription" "http" {
   count     = length(var.sns_endpoint_url) > 0 ? 1 : 0
-  topic_arn = aws_sns_topic.file_processing.arn
+  topic_arn = aws_sns_topic.pipeline_processing.arn
   protocol  = "http"
 
   endpoint = var.sns_endpoint_url
@@ -351,7 +351,7 @@ output "cluster_name" {
 }
 
 output "sns_topic_arn" {
-  value = aws_sns_topic.file_processing.arn
+  value = aws_sns_topic.pipeline_processing.arn
 }
 
 output "debug_url" {

@@ -11,20 +11,20 @@
 > 2) Provision the `pipeline_processing` EKS cluster + SNS wiring + Kubernetes resources:
 > ```bash
 > # Init the terraform working directory and create resources
-> cd infra/file_processing
+> cd infra/pipeline_processing
 > ./scripts/manage.sh init
 > ./scripts/manage.sh apply
 > ```
 >
 > Update code (build/push image and update deployment):
 > ```bash
-> cd infra/file_processing
+> cd infra/pipeline_processing
 > ./scripts/manage.sh update-image
 > ```
 >
 > Tear down the `pipeline_processing` cluster and app resources:
 > ```bash
-> cd infra/file_processing
+> cd infra/pipeline_processing
 > ./scripts/manage.sh destroy
 > ```
 
@@ -54,7 +54,7 @@ docker run --rm -p 8080:8080 \
 Use the module wrapper script (delegates to `infra/local/scripts/setup_localstack.sh`):
 
 ```bash
-cd infra/file_processing
+cd infra/pipeline_processing
 ./scripts/setup_localstack.sh host.docker.internal 8080
 ```
 
@@ -69,7 +69,7 @@ A test SNS message can then be published (see `infra/local/scripts/setup_localst
 
 Terraform lifecycle:
 ```bash
-cd infra/file_processing
+cd infra/pipeline_processing
 ./scripts/manage.sh init
 ./scripts/manage.sh plan
 ./scripts/manage.sh apply
@@ -77,13 +77,13 @@ cd infra/file_processing
 
 Build + push image and update the running deployment:
 ```bash
-cd infra/file_processing
+cd infra/pipeline_processing
 ./scripts/manage.sh update-image
 ```
 
 Notes:
-- This stack uses `aws_profile` / `aws_region` from `infra/file_processing/terraform/terraform.tfvars` (defaults: `etl-playground`, `us-gov-west-1`).
-- `./scripts/ecr_put.sh` pushes the image URI referenced in `infra/file_processing/terraform/container_image.txt`.
+- This stack uses `aws_profile` / `aws_region` from `infra/pipeline_processing/terraform/terraform.tfvars` (defaults: `etl-playground`, `us-gov-west-1`).
+- `./scripts/ecr_put.sh` pushes the image URI referenced in `infra/pipeline_processing/terraform/container_image.txt`.
 
 This directory provisions a dedicated **EKS cluster** for the `pipeline_processing` runtime plus the AWS wiring it needs (SNS topic and optional S3 bucket notifications). It is designed to run **after** `infra/foundation_network`, which owns the shared VPC/subnets/NAT/IGW.
 
@@ -92,13 +92,13 @@ This directory provisions a dedicated **EKS cluster** for the `pipeline_processi
 ## What this stack manages
 
 - EKS cluster + managed node group
-- SNS topic for file processing
+- SNS topic for pipeline processing
 - Optional: S3 bucket notifications (`s3:ObjectCreated:*`) -> SNS topic
 - Optional: HTTP subscription to SNS (`sns_endpoint_url`) if a stable endpoint is provided
 - Kubernetes resources deployed into the cluster:
   - Namespace
   - ServiceAccount
-  - Deployment (`file-processing-sns`)
+  - Deployment (`pipeline-processing-sns`)
   - Service (LoadBalancer)
 
 ## Key inputs
@@ -122,7 +122,7 @@ Values live in `terraform.tfvars`.
 
 ## IRSA (IAM Role for ServiceAccount) — concrete steps to enable pod S3 access
 
-The repository now includes Terraform resources that implement IRSA (OIDC provider + IAM role + least-privilege S3 policy) in `infra/file_processing/irsa.tf`.
+The repository now includes Terraform resources that implement IRSA (OIDC provider + IAM role + least-privilege S3 policy) in `infra/pipeline_processing/irsa.tf`.
 
 What follows is example output from running `aws iam list-open-id-connect-providers`:
 
@@ -137,7 +137,7 @@ Concrete steps (copy/paste)
 ```bash
 # Get the issuer URL for the cluster
 ISSUER_URL=$(aws eks describe-cluster \
-  --name file-processing-cluster \
+  --name pipeline-processing-cluster \
   --profile etl-playground \
   --region us-gov-west-1 \
   --query "cluster.identity.oidc.issuer" --output text)
@@ -154,10 +154,10 @@ THUMBPRINT=$(echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>
 echo "OIDC thumbprint: $THUMBPRINT"
 ```
 
-2) Add the thumbprint to `infra/file_processing/terraform.tfvars` (one-liner):
+2) Add the thumbprint to `infra/pipeline_processing/terraform.tfvars` (one-liner):
 
 ```hcl
-# infra/file_processing/terraform.tfvars
+# infra/pipeline_processing/terraform.tfvars
 oidc_thumbprint = "<paste-the-sha1-hex-here>"
 ```
 
@@ -165,36 +165,36 @@ oidc_thumbprint = "<paste-the-sha1-hex-here>"
 
 ```bash
 # from the infra directory for this stack or use the helper
-cd infra/file_processing
+cd infra/pipeline_processing
 ./scripts/manage.sh init
 ./scripts/manage.sh apply
 ```
 
 Notes on what Terraform creates
 - `aws_iam_openid_connect_provider.eks` — OIDC provider for the EKS issuer (created only if one doesn't already exist).
-- `aws_iam_role.file_processing_sa` — IAM role that can be assumed by the ServiceAccount via web identity.
-- `aws_iam_policy.file_processing_s3` — least-privilege S3 policy scoped to `var.bucket_name`.
-- `aws_iam_role_policy_attachment.file_processing_s3_attach` — attaches the policy to the role.
+- `aws_iam_role.pipeline_processing_sa` — IAM role that can be assumed by the ServiceAccount via web identity.
+- `aws_iam_policy.pipeline_processing_s3` — least-privilege S3 policy scoped to `var.bucket_name`.
+- `aws_iam_role_policy_attachment.pipeline_processing_s3_attach` — attaches the policy to the role.
 - The `kubernetes_service_account_v1` in `main.tf` is annotated with this role ARN so pods that use that ServiceAccount get short-lived credentials.
 
 4) Restart the Deployment so pods pick up the ServiceAccount annotation (if necessary):
 
 ```bash
-kubectl -n file-processing rollout restart deployment/file-processing-sns
-kubectl -n file-processing rollout status deployment/file-processing-sns
+kubectl -n pipeline-processing rollout restart deployment/pipeline-processing-sns
+kubectl -n pipeline-processing rollout status deployment/pipeline-processing-sns
 ```
 
 5) Verify the pod assumes the role and can call AWS APIs (STS identity + S3 test):
 
 ```bash
 # pick a pod
-POD=$(kubectl -n file-processing get pods -l app=file-processing-sns -o jsonpath='{.items[0].metadata.name}')
+POD=$(kubectl -n pipeline-processing get pods -l app=pipeline-processing-sns -o jsonpath='{.items[0].metadata.name}')
 
 # Check STS identity (should show the IRSA role ARN)
-kubectl -n file-processing exec $POD -- python -c "import boto3, json; print(boto3.client('sts').get_caller_identity())"
+kubectl -n pipeline-processing exec $POD -- python -c "import boto3, json; print(boto3.client('sts').get_caller_identity())"
 
 # Quick S3 read test (adjust bucket/key as needed)
-kubectl -n file-processing exec $POD -- python - <<'PY'
+kubectl -n pipeline-processing exec $POD -- python - <<'PY'
 import boto3
 s3 = boto3.client('s3', region_name='us-gov-west-1')
 resp = s3.list_objects_v2(Bucket='etl-ba-research-client-etl', Prefix='from_client/nm_albuquerque/')
@@ -202,7 +202,7 @@ print('Objects found:', resp.get('KeyCount'))
 PY
 ```
 
-If the STS call returns a role ARN that matches `aws_iam_role.file_processing_sa`, and the S3 call succeeds, the pod can pull objects from the bucket using IRSA.
+If the STS call returns a role ARN that matches `aws_iam_role.pipeline_processing_sa`, and the S3 call succeeds, the pod can pull objects from the bucket using IRSA.
 
 Importing an existing OIDC provider (only if one already exists)
 
@@ -210,7 +210,7 @@ When an OIDC provider exists for this cluster (check with `aws iam list-open-id-
 
 ```bash
 # find provider ARN and import (use -chdir to target the terraform subdir)
-terraform -chdir=infra/file_processing/terraform import aws_iam_openid_connect_provider.eks <provider-arn>
+terraform -chdir=infra/pipeline_processing/terraform import aws_iam_openid_connect_provider.eks <provider-arn>
 ./scripts/manage.sh plan
 ```
 
@@ -230,7 +230,7 @@ Security and best-practice notes
 
 ## Example: EKS Job (event-driven per-file processing)
 
-Create a Kubernetes Job spec that runs the `etl-file-processing` image with the `run s3_data_quality_job` args. Use the cluster's service account with IAM permissions to access S3 and RDS.
+Create a Kubernetes Job spec that runs the `etl-pipeline-processing` image with the `run s3_data_quality_job` args. Use the cluster's service account with IAM permissions to access S3 and RDS.
 
 Example `k8s/job-s3-data-quality.yaml`:
 
@@ -242,17 +242,17 @@ metadata:
 spec:
   template:
     spec:
-      serviceAccountName: file-processing-sa  # create an IAM role / IRSA binding for this SA
+      serviceAccountName: pipeline-processing-sa  # create an IAM role / IRSA binding for this SA
       containers:
-      - name: file-processing
-        image: example.com/etl-file-processing:latest
+      - name: pipeline-processing
+        image: example.com/etl-pipeline-processing:latest
         command: ["python", "-m", "pipeline_processing.cli.main"]
         args: ["run", "s3_data_quality_job", "--event-json", "<EVENT_JSON>"]
         envFrom:
         - secretRef:
-            name: file-processing-secrets
+            name: pipeline-processing-secrets
         - configMapRef:
-            name: file-processing-config
+            name: pipeline-processing-config
         volumeMounts:
         - name: tmp
           mountPath: /tmp
@@ -275,21 +275,21 @@ For a long-running listener that receives SNS POSTs directly (useful if you pref
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: file-processing-sns
+  name: pipeline-processing-sns
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: file-processing-sns
+      app: pipeline-processing-sns
   template:
     metadata:
       labels:
-        app: file-processing-sns
+        app: pipeline-processing-sns
     spec:
-      serviceAccountName: file-processing-sa
+      serviceAccountName: pipeline-processing-sa
       containers:
       - name: sns-listener
-        image: example.com/etl-file-processing:latest
+        image: example.com/etl-pipeline-processing:latest
         command: ["python"]
         args: ["-m", "pipeline_processing.cli.sns_main"]
         ports:
@@ -299,9 +299,9 @@ spec:
           value: "8080"
         envFrom:
         - secretRef:
-            name: file-processing-secrets
+            name: pipeline-processing-secrets
         - configMapRef:
-            name: file-processing-config
+            name: pipeline-processing-config
 ```
 
 Expose this Deployment with a Service (ClusterIP) and an Ingress/ALB with a stable HTTPS endpoint. Subscribe that HTTPS endpoint to the SNS topic in AWS (see "SNS subscription" below).
@@ -312,10 +312,10 @@ Expose this Deployment with a Service (ClusterIP) and an Ingress/ALB with a stab
 
 Keep non-sensitive configuration in a `ConfigMap` (S3 bucket names, destination prefixes, operator toggles). Put credentials and DB URL in a Kubernetes `Secret`.
 
-Example `file-processing-secrets` (kubernetes secret containing DATABASE_URL):
+Example `pipeline-processing-secrets` (kubernetes secret containing DATABASE_URL):
 
 ```bash
-kubectl create secret generic file-processing-secrets \
+kubectl create secret generic pipeline-processing-secrets \
   --from-literal=DATABASE_URL='postgresql://user:password@host:5432/dbname' \
   --from-literal=AWS_ACCESS_KEY_ID='...' \
   --from-literal=AWS_SECRET_ACCESS_KEY='...'
@@ -342,14 +342,14 @@ Security:
 ## Local testing (ngrok)
 
 To test SNS delivery locally:
-1. Run the SNS listener locally: `poetry run file-processing-sns` (or run the container with `-p 8080:8080`).
+1. Run the SNS listener locally: `poetry run pipeline-processing-sns` (or run the container with `-p 8080:8080`).
 2. Start an HTTP tunnel (e.g. `ngrok http 8080`) and use the public ngrok URL as the SNS subscription endpoint.
 3. Subscribe the ngrok URL in the SNS topic (HTTPS). Confirm subscription via the SubscribeURL (the listener will do this automatically if reachable).
 
 Alternative: skip SNS and run the job directly with an event JSON:
 
 ```bash
-poetry run file-processing run s3_data_quality_job -- --event-json '{"Records":[{"s3":{"bucket":{"name":"ignored"},"object":{"key":"from_client/nm_albuquerque/Officer_Detail.csv"}}}]}' --dry-run
+poetry run pipeline-processing run s3_data_quality_job -- --event-json '{"Records":[{"s3":{"bucket":{"name":"ignored"},"object":{"key":"from_client/nm_albuquerque/Officer_Detail.csv"}}}]}' --dry-run
 ```
 
 Set `LOCAL_S3_ROOT=./data` in `packages/pipeline_processing/.env` to have the job read local files instead of S3.
@@ -360,7 +360,7 @@ This repository includes helpers to run a full local SNS/S3 stack using LocalSta
 
 Summary:
 - `infra/local` contains shared local plumbing for LocalStack (docker-compose and central setup script).
-- Per‑perspective wrappers live in `infra/<perspective>/setup_localstack.sh` (for example `infra/file_processing/setup_localstack.sh`).
+- Per‑perspective wrappers live in `infra/<perspective>/setup_localstack.sh` (for example `infra/pipeline_processing/setup_localstack.sh`).
 - The local HTTP listener is `packages/pipeline_processing/cli/sns_main.py` and the helper runner is `packages/pipeline_processing/scripts/run_local_listener.sh`.
 
 Quick start (copy/paste):
@@ -377,10 +377,10 @@ sleep 6  # give LocalStack a few seconds to initialize
 
 ```bash
 # from repo root
-infra/file_processing/scripts/setup_localstack.sh host.docker.internal 8080 | tee /tmp/localstack-setup.log
+infra/pipeline_processing/scripts/setup_localstack.sh host.docker.internal 8080 | tee /tmp/localstack-setup.log
 ```
 
-This creates an S3 bucket named `etl-file-processing-client-etl` and an SNS topic `file-processing-topic` and subscribes `http://host.docker.internal:8080/`.
+This creates an S3 bucket named `etl-pipeline-processing-client-etl` and an SNS topic `pipeline-processing-topic` and subscribes `http://host.docker.internal:8080/`.
 
 3) Start the SNS listener locally (so LocalStack can POST to it). Run this in a dedicated terminal so you can see logs and use your IDE for breakpoints:
 
@@ -406,11 +406,11 @@ We added a HEAD handler to the listener so `curl -I` returns a healthy response 
 
 ```bash
 EDGE="https://localhost:4566"  # LocalStack edge
-TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:file-processing-topic"
+TOPIC_ARN="arn:aws:sns:us-east-1:000000000000:pipeline-processing-topic"
 
 aws --no-verify-ssl --endpoint-url "$EDGE" --region us-east-1 sns publish \
   --topic-arn "$TOPIC_ARN" \
-  --message '{"Records":[{"s3":{"bucket":{"name":"etl-file-processing-client-etl"},"object":{"key":"from_client/nm_albuquerque/Officer_Detail.csv"}}}]}'
+  --message '{"Records":[{"s3":{"bucket":{"name":"etl-pipeline-processing-client-etl"},"object":{"key":"from_client/nm_albuquerque/Officer_Detail.csv"}}}]}'
 ```
 
 Notes:
@@ -430,26 +430,26 @@ Troubleshooting (common issues)
 
 - `Address already in use` when starting the listener:
   - Find and stop the process using the port: `lsof -nP -iTCP:8080 -sTCP:LISTEN`
-- Or start the listener on another port and re-run the setup wrapper with that port: `infra/file_processing/scripts/setup_localstack.sh host.docker.internal 8090` and `PORT=8090 poetry run pipeline-processing run sns_listener`.
+- Or start the listener on another port and re-run the setup wrapper with that port: `infra/pipeline_processing/scripts/setup_localstack.sh host.docker.internal 8090` and `PORT=8090 poetry run pipeline-processing run sns_listener`.
 
 - If TLS/hostname mismatch warnings appear, the setup script uses `--no-verify-ssl` for LocalStack HTTPS; to avoid disabling verification, map a LocalStack hostname (for example `localhost.localstack.cloud`) to `127.0.0.1` and set `LOCALSTACK_HOSTNAME` so cert SANs match.
 
 Per‑perspective wrappers
 
-- `infra/file_processing/scripts/setup_localstack.sh` — calls the central `infra/local/scripts/setup_localstack.sh` with the `pipeline_processing` perspective.
+- `infra/pipeline_processing/scripts/setup_localstack.sh` — calls the central `infra/local/scripts/setup_localstack.sh` with the `pipeline_processing` perspective.
 
 Production mapping reminder
 
-- In production the SNS listener runs as a Deployment in EKS (see the "SNS HTTP listener Deployment" example below). Terraform in `infra/file_processing` wires the SNS topic and (optionally) the S3 notifications and subscribes the production HTTPS endpoint (the ALB/Ingress URL) instead of `host.docker.internal`.
+- In production the SNS listener runs as a Deployment in EKS (see the "SNS HTTP listener Deployment" example below). Terraform in `infra/pipeline_processing` wires the SNS topic and (optionally) the S3 notifications and subscribes the production HTTPS endpoint (the ALB/Ingress URL) instead of `host.docker.internal`.
 - The local dev flow mirrors the same code path so tests are representative of production behavior.
 
 ---
 
 ## Scripts (convenience helpers)
 
-This repository includes a small set of helper scripts in `infra/file_processing/scripts/` to perform common developer and operational tasks. Each script is intentionally narrow in scope so you can compose them in CI or call them manually.
+This repository includes a small set of helper scripts in `infra/pipeline_processing/scripts/` to perform common developer and operational tasks. Each script is intentionally narrow in scope so you can compose them in CI or call them manually.
 
-Location: `infra/file_processing/scripts/`
+Location: `infra/pipeline_processing/scripts/`
 
 Scripts provided (summary):
 
@@ -465,7 +465,7 @@ Scripts provided (summary):
   - Example:
     ```bash
     # Initialize
-    cd infra/file_processing
+    cd infra/pipeline_processing
     ./scripts/manage.sh init
 
     # Build/push image and apply
@@ -478,7 +478,7 @@ Scripts provided (summary):
 - `manage_cluster.sh` — Legacy/compatibility helper. Some older docs and CI may still call this script; prefer `manage.sh` going forward.
 
 - `ecr_put.sh` — Build and push the container image to ECR.
-  - What it does: ensures the ECR repository exists, logs in, builds a multi-arch image with `docker buildx`, pushes the image, and writes the pushed image URI to `infra/file_processing/terraform/container_image.txt`.
+  - What it does: ensures the ECR repository exists, logs in, builds a multi-arch image with `docker buildx`, pushes the image, and writes the pushed image URI to `infra/pipeline_processing/terraform/container_image.txt`.
   - Used by: `manage.sh` and `manage_cluster.sh`.
 
 - `s3_configure_notifications.sh` — Configure an S3 bucket to publish ObjectCreated events to a topic.

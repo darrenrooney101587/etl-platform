@@ -1,19 +1,19 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: file-processing-run-once
-  namespace: file-processing
+  name: pipeline-processing-run-once
+  namespace: pipeline-processing
 spec:
   backoffLimit: 1
   template:
     metadata:
       labels:
-        job: file-processing-run
+        job: pipeline-processing-run
     spec:
-      serviceAccountName: file-processing
+      serviceAccountName: pipeline-processing
       restartPolicy: Never
       containers:
-        - name: file-processing
+        - name: pipeline-processing
           image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/pipeline-processing:latest
           command:
             - python
@@ -23,9 +23,9 @@ spec:
             - hello_world
           envFrom:
             - configMapRef:
-                name: file-processing-config
+                name: pipeline-processing-config
             - secretRef:
-                name: file-processing-secret
+                name: pipeline-processing-secret
           env:
             - name: DJANGO_SETTINGS_MODULE
               value: "pipeline_processing.settings"

@@ -14,7 +14,7 @@ The Airflow control plane consists of:
 ## Directory Structure
 
 ```
-infra/airflow/
+infra/orchestration/
 ├── terraform/          # S3 bucket, IAM roles, and policies
 ├── k8s/               # Kubernetes manifests and Helm values
 └── scripts/           # Deployment and management scripts
@@ -33,7 +33,7 @@ infra/airflow/
 ### 1. Deploy Infrastructure (S3 Bucket, IAM)
 
 ```bash
-cd infra/airflow/scripts
+cd infra/orchestration/scripts
 
 # Initialize Terraform
 ./manage.sh init
@@ -102,7 +102,7 @@ minikube start
 ### 2. Start LocalStack and create the DAG bucket
 
 ```bash
-cd infra/airflow/scripts
+cd infra/orchestration/scripts
 ENVIRONMENT=dev ./setup_localstack.sh
 ```
 
@@ -134,7 +134,7 @@ command:
 ### 3. Deploy Airflow with Helm
 
 ```bash
-cd infra/airflow/scripts
+cd infra/orchestration/scripts
 ENVIRONMENT=dev DAG_BUCKET=etl-airflow-dags-dev ./deploy_airflow.sh install
 ```
 

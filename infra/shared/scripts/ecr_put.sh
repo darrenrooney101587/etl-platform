@@ -5,12 +5,12 @@ set -euo pipefail
 # Shared script to build and push docker images to ECR.
 #
 # Arguments:
-#   $1: MODULE_NAME (e.g. file_processing, reporting_seeder) - corresponds to packages/<name> and infra/<name>
+#   $1: MODULE_NAME (e.g. pipeline_processing, reporting_seeder) - corresponds to packages/<name> and infra/<name>
 #
 # Environment Variables:
 #   AWS_PROFILE (default: etl-playground)
 #   AWS_REGION (default: us-gov-west-1)
-#   ECR_REPO_NAME (default: converted from MODULE_NAME, e.g. file_processing -> file-processing)
+#   ECR_REPO_NAME (default: converted from MODULE_NAME, e.g. pipeline_processing -> pipeline-processing)
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <module_name>"
@@ -18,7 +18,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 MODULE_NAME="$1"
-# Convert underscores to hyphens for repo name default (e.g. file_processing -> file-processing)
+# Convert underscores to hyphens for repo name default (e.g. pipeline_processing -> pipeline-processing)
 DEFAULT_REPO_NAME="${MODULE_NAME//_/-}"
 
 AWS_PROFILE="${AWS_PROFILE:-etl-playground}"
@@ -44,7 +44,7 @@ if [[ ! -f "${DOCKERFILE_PATH}" ]]; then
   # Also try without the prefix if that fails, though standard seems to be <name>.Dockerfile
   if [[ ! -f "${FALLBACK_DOCKERFILE}" ]]; then
      # Try just package root Dockerfile if naming varies?
-     # But let's stick to the convention seen in file_processing/reporting_seeder
+     # But let's stick to the convention seen in pipeline_processing/reporting_seeder
      FALLBACK_DOCKERFILE="${REPO_ROOT}/packages/${MODULE_NAME}/${DEFAULT_REPO_NAME}.Dockerfile"
   fi
 

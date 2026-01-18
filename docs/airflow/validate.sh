@@ -31,17 +31,17 @@ warn() {
 # Check 1: Infrastructure files
 echo "Checking infrastructure files..."
 required_infra_files=(
-    "infra/airflow/README.md"
-    "infra/airflow/terraform/main.tf"
-    "infra/airflow/terraform/variables.tf"
-    "infra/airflow/terraform/outputs.tf"
-    "infra/airflow/terraform/providers.tf"
-    "infra/airflow/k8s/airflow-values.yaml"
-    "infra/airflow/k8s/airflow-configmap.yaml"
-    "infra/airflow/k8s/namespaces.yaml"
-    "infra/airflow/scripts/manage.sh"
-    "infra/airflow/scripts/deploy_airflow.sh"
-    "infra/airflow/scripts/setup_localstack.sh"
+    "infra/orchestration/README.md"
+    "infra/orchestration/terraform/main.tf"
+    "infra/orchestration/terraform/variables.tf"
+    "infra/orchestration/terraform/outputs.tf"
+    "infra/orchestration/terraform/providers.tf"
+    "infra/orchestration/k8s/airflow-values.yaml"
+    "infra/orchestration/k8s/airflow-configmap.yaml"
+    "infra/orchestration/k8s/namespaces.yaml"
+    "infra/orchestration/scripts/manage.sh"
+    "infra/orchestration/scripts/deploy_airflow.sh"
+    "infra/orchestration/scripts/setup_localstack.sh"
 )
 
 for file in "${required_infra_files[@]}"; do
@@ -143,9 +143,9 @@ echo ""
 # Check 7: Shell script syntax
 echo "Validating shell scripts..."
 shell_scripts=(
-    "infra/airflow/scripts/manage.sh"
-    "infra/airflow/scripts/deploy_airflow.sh"
-    "infra/airflow/scripts/setup_localstack.sh"
+    "infra/orchestration/scripts/manage.sh"
+    "infra/orchestration/scripts/deploy_airflow.sh"
+    "infra/orchestration/scripts/setup_localstack.sh"
 )
 
 for file in "${shell_scripts[@]}"; do

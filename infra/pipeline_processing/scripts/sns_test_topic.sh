@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Lightweight test helper to publish a sample SNS S3-event JSON to the file-processing topic.
+# Lightweight test helper to publish a sample SNS S3-event JSON to the pipeline-processing topic.
 # Usage: ./sns_test_topic.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,13 +10,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if git -C "$SCRIPT_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
   REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 else
-  # Script lives at: <repo-root>/infra/file_processing/scripts
+  # Script lives at: <repo-root>/infra/pipeline_processing/scripts
   # go up three levels to reach repo root
   REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 fi
 
-# Terraform directory for the file_processing infra (repo-root/infra/file_processing/terraform)
-TF_DIR="$REPO_ROOT/infra/file_processing/terraform"
+# Terraform directory for the pipeline_processing infra (repo-root/infra/pipeline_processing/terraform)
+TF_DIR="$REPO_ROOT/infra/pipeline_processing/terraform"
 
 echo "Repo root: $REPO_ROOT"
 echo "Terraform dir: $TF_DIR"

@@ -4,12 +4,12 @@ set -euo pipefail
 # manage.sh - Shared infrastructure manager
 #
 # Arguments:
-#   $1: MODULE_NAME (e.g. file_processing, reporting_seeder)
+#   $1: MODULE_NAME (e.g. pipeline_processing, reporting_seeder)
 #   $2: COMMAND (init|plan|apply|destroy|update-image|outputs)
 #
 # Environment Variables:
-#   NAMESPACE (default: <module-name-with-hyphens>, e.g. file-processing)
-#   DEPLOYMENT_NAME (default: <namespace>-sns for file_processing, else <namespace>)
+#   NAMESPACE (default: <module-name-with-hyphens>, e.g. pipeline-processing)
+#   DEPLOYMENT_NAME (default: <namespace>-sns for pipeline_processing, else <namespace>)
 #   CONTAINER_NAME (default: derived from module behavior)
 
 if [[ $# -lt 2 ]]; then
@@ -28,8 +28,8 @@ NAMESPACE="${NAMESPACE:-$MODULE_K8S_NAME}"
 
 # Heuristic for DEPLOYMENT_NAME if not set
 if [[ -z "${DEPLOYMENT_NAME:-}" ]]; then
-  if [[ "$MODULE_NAME" == "file_processing" ]]; then
-    DEPLOYMENT_NAME="file-processing-sns"
+  if [[ "$MODULE_NAME" == "pipeline_processing" ]]; then
+    DEPLOYMENT_NAME="pipeline-processing-sns"
   elif [[ "$MODULE_NAME" == "observability" ]]; then
     DEPLOYMENT_NAME="observability-jobs"
   else
@@ -40,7 +40,7 @@ fi
 # Heuristic for CONTAINER_NAME (name of the container in the pod spec to update)
 # Usually matches the app label or deployment name, but sometimes varies
 if [[ -z "${CONTAINER_NAME:-}" ]]; then
-  if [[ "$MODULE_NAME" == "file_processing" ]]; then
+  if [[ "$MODULE_NAME" == "pipeline_processing" ]]; then
     CONTAINER_NAME="sns-listener"
   elif [[ "$MODULE_NAME" == "reporting_seeder" ]]; then
     CONTAINER_NAME="reporting-seeder"

@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: file-processing-config
-  namespace: file-processing
+  name: pipeline-processing-config
+  namespace: pipeline-processing
   labels:
-    app: file-processing
+    app: pipeline-processing
     component: sns-listener
-    part-of: file-processing
+    part-of: pipeline-processing
 
 data:
   DB_HOST: host.docker.internal

@@ -11,7 +11,7 @@ terraform {
   backend "s3" {
     # Configure via backend config file or CLI args:
     # terraform init -backend-config="bucket=terraform-state-bucket" \
-    #                -backend-config="key=airflow/terraform.tfstate" \
+    #                -backend-config="key=orchestration/terraform.tfstate" \
     #                -backend-config="region=us-gov-west-1"
   }
 }

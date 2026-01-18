@@ -35,7 +35,7 @@ This document describes how to deploy the Airflow DAG distribution system from i
 Navigate to the Airflow infrastructure directory:
 
 ```bash
-cd infra/airflow/scripts
+cd infra/orchestration/scripts
 ```
 
 Initialize Terraform:
@@ -77,7 +77,7 @@ Required outputs from the Terraform apply:
 
 ### Step 2: Deploy Airflow to Kubernetes
 
-Update the Helm values with the IAM role ARN by editing `infra/airflow/k8s/airflow-values.yaml`:
+Update the Helm values with the IAM role ARN by editing `infra/orchestration/k8s/airflow-values.yaml`:
 
 ```yaml
 serviceAccount:
@@ -244,7 +244,7 @@ The package DAG write policy must be attached to the IAM role or user used by CI
 
 ```bash
 # Get the policy ARN from Terraform outputs
-cd infra/airflow/scripts
+cd infra/orchestration/scripts
 POLICY_ARN=$(./manage.sh outputs | grep package_dag_write_policy_arn | awk '{print $3}' | tr -d '"')
 
 # Attach to the CI role

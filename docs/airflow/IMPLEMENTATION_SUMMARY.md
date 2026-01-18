@@ -4,7 +4,7 @@ This document summarizes the complete implementation of the S3-based Airflow DAG
 
 ## What Was Implemented
 
-### 1. Infrastructure (infra/airflow/)
+### 1. Infrastructure (infra/orchestration/)
 
 **Terraform Configuration**
 - S3 bucket for DAG storage with versioning and encryption
@@ -227,7 +227,7 @@ aws s3api copy-object \
 
 ### Infrastructure (15 files)
 ```
-infra/airflow/
+infra/orchestration/
 ├── README.md
 ├── terraform/
 │   ├── main.tf
