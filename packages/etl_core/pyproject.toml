@@ -10,6 +10,10 @@ packages = [{ include = "etl_core", from = ".." }]
 python = "^3.10"
 boto3 = "^1.26"
 psycopg2-binary = "^2.9"
+django = { version = "^4.2", optional = true }
+
+[tool.poetry.extras]
+models = ["django"]
 
 [build-system]
 requires = ["poetry-core"]
