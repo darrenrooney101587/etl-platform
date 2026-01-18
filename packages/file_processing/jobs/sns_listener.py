@@ -354,14 +354,12 @@ def entrypoint(argv: List[str]) -> int:
     # In practice this works fine.
     httpd = HTTPServer(server_address, SNSRequestHandler) # type: ignore
 
-    # Configure a bounded thread pool for background job processing. Default to 10 workers.
     try:
         max_workers = int(os.getenv("SNS_WORKER_MAX", "10"))
     except Exception:
         max_workers = 10
     httpd.executor = ThreadPoolExecutor(max_workers=max_workers)  # type: ignore
 
-    # Configure circuit breaker parameters
     try:
         circuit_breaker_max_failures = int(
             os.getenv("CIRCUIT_BREAKER_MAX_FAILURES", "5")
