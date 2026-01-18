@@ -117,7 +117,6 @@ class RefreshProcessor:
         start_delay = max(0, int(self._config.start_delay_ms)) / 1000.0
 
         all_futures = []
-        # Create chunks of manifests
         for i in range(0, len(manifests), batch_size):
             chunk = manifests[i : i + batch_size]
             logger.info("Submitting batch %d - %d (size=%d)", i + 1, i + len(chunk), len(chunk))
