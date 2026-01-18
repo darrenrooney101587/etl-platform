@@ -13,13 +13,12 @@ django = "^4.2"
 psycopg2-binary = "^2.9"
 boto3 = "^1.37"
 python-json-logger = "^4.0"
-etl-database-schema = { git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git" }
 pyarrow = { version = "^14.0.0", optional = true }
 playwright = { version = "^1.40.0", optional = true }
 sendgrid = { version = "^6.11.0", optional = true }
 
 [tool.poetry.extras]
-db = ["etl-database-schema", "django"]
+db = ["django"]
 parquet = ["pyarrow"]
 pdf-email = ["playwright", "sendgrid"]
 

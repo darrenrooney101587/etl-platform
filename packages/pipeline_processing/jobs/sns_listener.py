@@ -327,7 +327,7 @@ def entrypoint(argv: List[str]) -> int:
     Returns:
         Exit code (SNS main runs forever until interrupted).
     """
-    # Bootstrap Django early so that importing etl_database_schema models works
+    # Bootstrap Django early so that importing etl_core.models models works
     # inside worker threads or repository modules. Allow DJANGO_SETTINGS_MODULE to
     # be configured via env (preferred) otherwise default to package settings.
     os.environ.setdefault(

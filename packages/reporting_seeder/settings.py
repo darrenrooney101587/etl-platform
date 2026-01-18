@@ -1,15 +1,15 @@
 """Minimal Django settings for reporting_seeder jobs.
 
 This settings module is used when bootstrapping Django to support
-etl_database_schema ORM models during seed/refresh operations.
+etl_core.models ORM models during seed/refresh operations.
 """
 import os
 
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
-    "etl_database_schema.apps.bms",
-    "etl_database_schema.apps.bms_reporting",
+    "etl_core.models.apps.bms",
+    "etl_core.models.apps.bms_reporting",
 ]
 
 # Configure database from environment variables (consistent with SeederConfig)

@@ -29,8 +29,8 @@ class MonitoringRepositoryTests(unittest.TestCase):
         self.MonitoringFileSchemaDefinition = MagicMock()
         self.MonitoringFileSchemaDefinitionVersion = MagicMock()
 
-        # Inject fake etl_database_schema into sys.modules
-        self._fake_mod_name = 'etl_database_schema.apps.bms_reporting.models'
+        # Inject fake etl_core.models into sys.modules
+        self._fake_mod_name = 'etl_core.models.apps.bms_reporting.models'
         fake_mod = types.ModuleType(self._fake_mod_name)
         fake_mod.MonitoringFile = self.MonitoringFile
         fake_mod.MonitoringFileRun = self.MonitoringFileRun
@@ -43,9 +43,10 @@ class MonitoringRepositoryTests(unittest.TestCase):
         sys.modules[self._fake_mod_name] = fake_mod
 
         # Ensure parent packages exist so imports resolve
-        sys.modules.setdefault('etl_database_schema', types.ModuleType('etl_database_schema'))
-        sys.modules.setdefault('etl_database_schema.apps', types.ModuleType('etl_database_schema.apps'))
-        sys.modules.setdefault('etl_database_schema.apps.bms_reporting', types.ModuleType('etl_database_schema.apps.bms_reporting'))
+        sys.modules.setdefault('etl_core', types.ModuleType('etl_core'))
+        sys.modules.setdefault('etl_core.models', types.ModuleType('etl_core.models'))
+        sys.modules.setdefault('etl_core.models.apps', types.ModuleType('etl_core.models.apps'))
+        sys.modules.setdefault('etl_core.models.apps.bms_reporting', types.ModuleType('etl_core.models.apps.bms_reporting'))
 
     def tearDown(self) -> None:
         if self._previous_module:

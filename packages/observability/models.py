@@ -2,7 +2,7 @@
 
 These models mirror the upstream `reporting` schema and are kept `managed=True`
 so local tests can create tables via `migrate --run-syncdb`. In production the
-authoritative schema lives in the shared etl_database_schema package.
+authoritative schema lives in the etl_core.models package.
 """
 from __future__ import annotations
 
