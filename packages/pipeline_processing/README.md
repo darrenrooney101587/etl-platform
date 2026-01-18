@@ -1,7 +1,6 @@
-# data_pipeline
+# pipeline_processing
 
-Combined transforms + ingestion runtime lane.
-Compute + side‑effecting writes.
+Pipeline processing package combining transforms, ingestion, data quality validation, and file processing.
 
 ## Responsibilities
 
@@ -9,7 +8,17 @@ Compute + side‑effecting writes.
 - Enrichment & normalization
 - Backfills / reprocessing
 - Application API ingestion
+- Data quality validation and profiling
+- File processing and monitoring
 - Idempotency, batching, DLQ, audit trails
+
+## Package History
+
+This package is the result of merging two packages:
+- `data_pipeline` - Combined transforms + ingestion runtime lane
+- `file_processing` - Data quality validation and file processing pipeline
+
+Both packages have been consolidated into `pipeline_processing` to better reflect the high-level data engineering concerns alongside other major facets (observability, orchestration, etl_core).
 
 ## Migration Notes
 
@@ -35,15 +44,15 @@ Why this is recommended
 
 Console scripts
 
-- `data-pipeline` → general module entrypoint (configured as the image ENTRYPOINT in our Dockerfile).
-- `data-pipeline-get-s3-files` → specific job CLI that runs the S3 file processing flow.
+- `pipeline-processing` → general module entrypoint (configured as the image ENTRYPOINT in our Dockerfile).
+- `pipeline-processing-get-s3-files` → specific job CLI that runs the S3 file processing flow.
 
 Preferred production run (ENTRYPOINT set to console script)
 
 ```bash
 # Image must be built so the console script is installed and available as the ENTRYPOINT.
 # The Job only passes arguments to the container.
-docker run --rm etl-data-pipeline \
+docker run --rm etl-pipeline-processing \
   --agency-id 10 \
   --source-bucket benchmarkanalytics-production-env-userdocument-test \
   --destination-bucket etl-ba-research-client-etl
@@ -53,8 +62,8 @@ Fallback production run (explicit invocation)
 
 ```bash
 # If the image does not set ENTRYPOINT, invoke the console script explicitly.
-docker run --rm etl-data-pipeline \
-  data-pipeline-get-s3-files --agency-id 10 \
+docker run --rm etl-pipeline-processing \
+  pipeline-processing-get-s3-files --agency-id 10 \
   --source-bucket benchmarkanalytics-production-env-userdocument-test \
   --destination-bucket etl-ba-research-client-etl
 ```
@@ -65,12 +74,12 @@ Developer workflow (mount source, auto-install deps)
 # Mount local source into the container and use the dev entrypoint which
 # will install dependencies if necessary. This is for iterative development.
 docker run --rm -it \
-  -v "$(pwd)/packages/data_pipeline:/app/packages/data_pipeline" \
+  -v "$(pwd)/packages/pipeline_processing:/app/packages/pipeline_processing" \
   -v "$(pwd)/packages/etl_core:/app/packages/etl_core" \
-  --workdir /app/packages/data_pipeline \
-  --entrypoint /app/packages/data_pipeline/config_scripts/docker-entrypoint.sh \
-  etl-data-pipeline \
-  poetry run data-pipeline-get-s3-files --agency-id 10
+  --workdir /app/packages/pipeline_processing \
+  --entrypoint /app/packages/pipeline_processing/config_scripts/docker-entrypoint.sh \
+  etl-pipeline-processing \
+  poetry run pipeline-processing-get-s3-files --agency-id 10
 ```
 
 Set environment variable `SKIP_INSTALL=1` when dependencies are already present and the install step should be skipped.
@@ -88,9 +97,9 @@ spec:
       restartPolicy: Never
       containers:
         - name: get-s3-files
-          image: ghcr.example.com/your-org/etl-data-pipeline:latest
+          image: ghcr.example.com/your-org/etl-pipeline-processing:latest
           # Preferred: set the image ENTRYPOINT to the console script and pass args only
-          command: [ "data-pipeline" ]
+          command: [ "pipeline-processing" ]
           args:
             - "--agency-id"
             - "10"

@@ -1,13 +1,4 @@
 services:
-  file-processing:
-    image: etl-file-processing
-    build:
-      context: ../
-      dockerfile: ../packages/file_processing/file-processing.Dockerfile
-    volumes:
-      - ../packages/file_processing:/app/packages/file_processing
-      - ../packages/etl_core:/app/packages/etl_core
-
   pipeline-processing:
     image: etl-pipeline-processing
     build:
