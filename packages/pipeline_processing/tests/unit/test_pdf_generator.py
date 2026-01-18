@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-from file_processing.processors.pdf_generator import PDFGenerator, PDFGeneratorConfig
+from pipeline_processing.processors.pdf_generator import PDFGenerator, PDFGeneratorConfig
 
 
 class TestPDFGeneratorConfig(unittest.TestCase):
@@ -62,7 +62,7 @@ class TestPDFGenerator(unittest.TestCase):
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
-    @patch("file_processing.processors.pdf_generator.sync_playwright")
+    @patch("pipeline_processing.processors.pdf_generator.sync_playwright")
     def test_generate_pdf_success(self, mock_sync_playwright):
         """Test successful PDF generation."""
         # Mock Playwright components
@@ -93,7 +93,7 @@ class TestPDFGenerator(unittest.TestCase):
         self.assertTrue(output_path.endswith("test_report.pdf"))
         self.assertIn(self.temp_dir, output_path)
 
-    @patch("file_processing.processors.pdf_generator.sync_playwright")
+    @patch("pipeline_processing.processors.pdf_generator.sync_playwright")
     def test_generate_pdf_with_query_params(self, mock_sync_playwright):
         """Test PDF generation with query parameters."""
         mock_playwright_ctx = MagicMock()
@@ -116,7 +116,7 @@ class TestPDFGenerator(unittest.TestCase):
         self.assertIn("run_id=123", called_url)
         self.assertIn("timestamp=456", called_url)
 
-    @patch("file_processing.processors.pdf_generator.sync_playwright")
+    @patch("pipeline_processing.processors.pdf_generator.sync_playwright")
     def test_generate_pdf_creates_output_dir(self, mock_sync_playwright):
         """Test that output directory is created if it doesn't exist."""
         mock_playwright_ctx = MagicMock()
@@ -140,7 +140,7 @@ class TestPDFGenerator(unittest.TestCase):
     def test_generate_pdf_playwright_not_installed(self):
         """Test error handling when Playwright is not installed."""
         with patch(
-            "file_processing.processors.pdf_generator.sync_playwright",
+            "pipeline_processing.processors.pdf_generator.sync_playwright",
             side_effect=ImportError("No module named 'playwright'"),
         ):
             with self.assertRaises(RuntimeError) as ctx:
@@ -148,7 +148,7 @@ class TestPDFGenerator(unittest.TestCase):
 
             self.assertIn("Playwright is required", str(ctx.exception))
 
-    @patch("file_processing.processors.pdf_generator.sync_playwright")
+    @patch("pipeline_processing.processors.pdf_generator.sync_playwright")
     def test_generate_pdf_browser_error(self, mock_sync_playwright):
         """Test error handling when browser fails."""
         mock_playwright_ctx = MagicMock()
@@ -161,7 +161,7 @@ class TestPDFGenerator(unittest.TestCase):
 
         self.assertIn("PDF generation failed", str(ctx.exception))
 
-    @patch("file_processing.processors.pdf_generator.sync_playwright")
+    @patch("pipeline_processing.processors.pdf_generator.sync_playwright")
     def test_generate_pdf_auto_filename(self, mock_sync_playwright):
         """Test automatic filename generation with timestamp."""
         mock_playwright_ctx = MagicMock()

@@ -80,7 +80,7 @@ class TestEmailSender(unittest.TestCase):
         )
         self.sender = EmailSender(config=self.config)
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_success(self, mock_smtp_class):
         """Test successful email sending."""
         mock_server = MagicMock()
@@ -98,7 +98,7 @@ class TestEmailSender(unittest.TestCase):
         mock_server.login.assert_called_once_with("test_user", "test_password")
         mock_server.send_message.assert_called_once()
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_default_recipient(self, mock_smtp_class):
         """Test email sending with default recipient."""
         mock_server = MagicMock()
@@ -113,7 +113,7 @@ class TestEmailSender(unittest.TestCase):
         sent_message = mock_server.send_message.call_args[0][0]
         self.assertIn("default@example.com", sent_message["To"])
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_with_html(self, mock_smtp_class):
         """Test email sending with HTML body."""
         mock_server = MagicMock()
@@ -128,7 +128,7 @@ class TestEmailSender(unittest.TestCase):
 
         mock_server.send_message.assert_called_once()
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_with_attachment(self, mock_smtp_class):
         """Test email sending with PDF attachment."""
         mock_server = MagicMock()
@@ -152,7 +152,7 @@ class TestEmailSender(unittest.TestCase):
         finally:
             os.unlink(tmp_path)
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_attachment_not_found(self, mock_smtp_class):
         """Test error handling when attachment file is not found."""
         mock_server = MagicMock()
@@ -166,7 +166,7 @@ class TestEmailSender(unittest.TestCase):
                 attachment_paths=["/nonexistent/file.pdf"],
             )
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_multiple_recipients(self, mock_smtp_class):
         """Test email sending to multiple recipients."""
         mock_server = MagicMock()
@@ -197,7 +197,7 @@ class TestEmailSender(unittest.TestCase):
 
         self.assertIn("SMTP password not configured", str(ctx.exception))
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_smtp_error(self, mock_smtp_class):
         """Test error handling when SMTP fails."""
         mock_smtp_class.return_value.__enter__.side_effect = Exception("SMTP connection failed")
@@ -211,7 +211,7 @@ class TestEmailSender(unittest.TestCase):
 
         self.assertIn("Email sending failed", str(ctx.exception))
 
-    @patch("file_processing.processors.email_sender.smtplib.SMTP")
+    @patch("pipeline_processing.processors.email_sender.smtplib.SMTP")
     def test_send_email_default_body(self, mock_smtp_class):
         """Test default body text is used when none provided."""
         mock_server = MagicMock()

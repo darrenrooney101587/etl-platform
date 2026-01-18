@@ -168,7 +168,7 @@ def entrypoint(argv: List[str]) -> int:
 
         try:
             if not os.getenv("DJANGO_SETTINGS_MODULE"):
-                os.environ["DJANGO_SETTINGS_MODULE"] = "file_processing.settings"
+                os.environ["DJANGO_SETTINGS_MODULE"] = "pipeline_processing.settings"
             import django  # type: ignore
 
             django.setup()

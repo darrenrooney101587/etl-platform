@@ -34,7 +34,7 @@ from pipeline_processing.models.monitoring import (
 logger = logging.getLogger(__name__)
 
 
-def _bootstrap_django_if_needed(settings_module: str = "file_processing.settings") -> None:
+def _bootstrap_django_if_needed(settings_module: str = "pipeline_processing.settings") -> None:
     """Ensure Django is configured before ORM access.
 
     Raises RuntimeError if settings are missing or bootstrap fails.

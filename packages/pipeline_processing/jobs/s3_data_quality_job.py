@@ -108,7 +108,7 @@ def entrypoint(argv: List[str]) -> int:
     # Configure basic logging to ensuring INFO logs appear on stdout
     # Only force configuration if we are the main script execution.
     # When called from sns_main, we reuse the existing logger configuration.
-    is_main_script = __name__ == "__main__" or "file_processing.jobs.s3_data_quality_job" in str(argv)
+    is_main_script = __name__ == "__main__" or "pipeline_processing.jobs.s3_data_quality_job" in str(argv)
 
     if is_main_script and not logging.getLogger().handlers:
         logging.basicConfig(
@@ -149,7 +149,7 @@ def entrypoint(argv: List[str]) -> int:
 
         try:
             if not os.getenv("DJANGO_SETTINGS_MODULE"):
-                os.environ["DJANGO_SETTINGS_MODULE"] = "file_processing.settings"
+                os.environ["DJANGO_SETTINGS_MODULE"] = "pipeline_processing.settings"
             import django  # type: ignore
             django.setup()
 

@@ -1,4 +1,4 @@
-"""SNS HTTP entrypoint for file_processing.
+"""SNS HTTP entrypoint for pipeline_processing.
 
 This module provides a minimal HTTP server used in development and in-cluster
 deployments to accept AWS SNS HTTPS notifications. It handles Subscription
@@ -332,7 +332,7 @@ def entrypoint(argv: List[str]) -> int:
     # be configured via env (preferred) otherwise default to package settings.
     os.environ.setdefault(
         "DJANGO_SETTINGS_MODULE",
-        os.getenv("DJANGO_SETTINGS_MODULE", "file_processing.settings"),
+        os.getenv("DJANGO_SETTINGS_MODULE", "pipeline_processing.settings"),
     )
     try:
         # Deferred import so Django is only required at runtime when running the server.

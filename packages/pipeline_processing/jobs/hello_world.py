@@ -1,4 +1,4 @@
-"""Hello-world smoke-test job for the file_processing package.
+"""Hello-world smoke-test job for the pipeline_processing package.
 
 This job exists to support Kubernetes and CI smoke checks. It intentionally
 avoids external dependencies (S3, DB, AWS) and simply logs a message.
@@ -29,7 +29,7 @@ def entrypoint(argv: List[str]) -> int:
     parser.add_argument("--message", default="hello world", help="Message to log")
     args = parser.parse_args(argv)
 
-    logger.info("file_processing hello_world: %s", args.message)
+    logger.info("pipeline_processing hello_world: %s", args.message)
     return 0
 
 
