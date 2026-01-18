@@ -21,7 +21,7 @@ class S3FileProcessor(S3Client):
 
     It is intentionally generic: job-specific conventions (mapping key names,
     agency/tenant folder logic, metadata filename/subfolder conventions) must be
-    provided by caller code (for example from `packages/data_pipeline`).
+    provided by caller code (for example from `packages/pipeline_processing`).
     """
 
     def __init__(

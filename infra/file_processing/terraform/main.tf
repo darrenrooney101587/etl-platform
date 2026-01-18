@@ -251,10 +251,10 @@ resource "kubernetes_deployment_v1" "sns_listener" {
         container {
           name    = "sns-listener"
           image   = var.image
-          # Override the Docker ENTRYPOINT ("python -m file_processing.cli.main")
+          # Override the Docker ENTRYPOINT ("python -m pipeline_processing.cli.main")
           # so we can invoke the sns_main module directly.
           command = ["python"]
-          args    = ["-m", "file_processing.cli.sns_main"]
+          args    = ["-m", "pipeline_processing.cli.sns_main"]
 
           port {
             name           = "http"

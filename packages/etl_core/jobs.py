@@ -34,13 +34,13 @@ def discover_package_jobs(package_name: str) -> Dict[str, JobDefinition]:
     tuple in the format: (entrypoint_callable, description_string).
 
     Args:
-        package_name: Top-level package name to scan (e.g., 'data_pipeline').
+        package_name: Top-level package name to scan (e.g., 'pipeline_processing').
 
     Returns:
         Dictionary mapping job names to JobDefinition instances.
 
     Example:
-        >>> registry = discover_package_jobs('data_pipeline')
+        >>> registry = discover_package_jobs('pipeline_processing')
         >>> job = registry.get('example_job')
         >>> if job:
         ...     exit_code = job.entrypoint(['--help'])

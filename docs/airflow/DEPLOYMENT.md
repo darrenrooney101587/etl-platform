@@ -168,7 +168,7 @@ Reference DAG template (KubernetesPodOperator pattern):
 ```
 
 Existing examples:
-- `packages/data_pipeline/airflow_dags/`
+- `packages/pipeline_processing/airflow_dags/`
 - `packages/reporting_seeder/airflow_dags/`
 
 ### Step 2: Add GitLab CI Stage
@@ -347,13 +347,13 @@ kubectl logs -n etl-jobs <pod-name> -f
 .dag_publish_base:
   extends: .dag_publish_template
   variables:
-    PACKAGE_NAME: data_pipeline
+    PACKAGE_NAME: pipeline_processing
 
 publish_dags_dev:
   extends: .dag_publish_base
   variables:
     ENVIRONMENT: dev
-    IMAGE_TAG: ${ECR_REPO}/data-pipeline:${CI_COMMIT_SHA}
+    IMAGE_TAG: ${ECR_REPO}/pipeline-processing:${CI_COMMIT_SHA}
     DAG_BUCKET: ${DAG_BUCKET_DEV}
   only:
     - main
@@ -362,7 +362,7 @@ publish_dags_staging:
   extends: .dag_publish_base
   variables:
     ENVIRONMENT: staging
-    IMAGE_TAG: ${ECR_REPO}/data-pipeline:${CI_COMMIT_TAG}
+    IMAGE_TAG: ${ECR_REPO}/pipeline-processing:${CI_COMMIT_TAG}
     DAG_BUCKET: ${DAG_BUCKET_STAGING}
   only:
     - tags
@@ -371,7 +371,7 @@ publish_dags_prod:
   extends: .dag_publish_base
   variables:
     ENVIRONMENT: prod
-    IMAGE_TAG: ${ECR_REPO}/data-pipeline:${CI_COMMIT_TAG}
+    IMAGE_TAG: ${ECR_REPO}/pipeline-processing:${CI_COMMIT_TAG}
     DAG_BUCKET: ${DAG_BUCKET_PROD}
   only:
     - tags

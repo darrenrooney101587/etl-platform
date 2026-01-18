@@ -1,4 +1,4 @@
-"""Unit tests for etl_core S3Client (migrated from data_pipeline tests).
+"""Unit tests for etl_core S3Client (migrated from pipeline_processing tests).
 
 These tests were adapted to import from etl_core and to patch the correct
 module paths.

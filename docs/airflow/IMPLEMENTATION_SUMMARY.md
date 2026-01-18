@@ -49,9 +49,9 @@ airflow-dag-publisher list       # List published DAGs
 
 ### 3. Example DAGs
 
-**data_pipeline**
-- `data_pipeline_example_job.py`: Demonstrates KubernetesPodOperator pattern
-- Runs the example_job from the data_pipeline package
+**pipeline_processing**
+- `pipeline_processing_example_job.py`: Demonstrates KubernetesPodOperator pattern
+- Runs the example_job from the pipeline_processing package
 
 **reporting_seeder**
 - `reporting_seeder_refresh_all.py`: Production-like DAG
@@ -208,7 +208,7 @@ aws s3api copy-object \
 ### Immediate
 
 1. Deploy to dev environment following DEPLOYMENT.md
-2. Publish example DAGs from data_pipeline and reporting_seeder
+2. Publish example DAGs from pipeline_processing and reporting_seeder
 3. Verify end-to-end flow
 
 ### Short-Term
@@ -266,8 +266,8 @@ packages/orchestration/
 
 ### Example DAGs (2 files)
 ```
-packages/data_pipeline/airflow_dags/
-└── data_pipeline_example_job.py
+packages/pipeline_processing/airflow_dags/
+└── pipeline_processing_example_job.py
 
 packages/reporting_seeder/airflow_dags/
 └── reporting_seeder_refresh_all.py

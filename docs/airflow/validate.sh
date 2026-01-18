@@ -79,10 +79,10 @@ echo ""
 
 # Check 3: Example DAGs
 echo "Checking example DAG files..."
-if [ -f "${ROOT_DIR}/packages/data_pipeline/airflow_dags/data_pipeline_example_job.py" ]; then
-    pass "Found: data_pipeline example DAG"
+if [ -f "${ROOT_DIR}/packages/pipeline_processing/airflow_dags/pipeline_processing_example_job.py" ]; then
+    pass "Found: pipeline_processing example DAG"
 else
-    fail "Missing: data_pipeline example DAG"
+    fail "Missing: pipeline_processing example DAG"
 fi
 
 if [ -f "${ROOT_DIR}/packages/reporting_seeder/airflow_dags/reporting_seeder_refresh_all.py" ]; then
@@ -127,7 +127,7 @@ python_files=(
     "packages/orchestration/validators.py"
     "packages/orchestration/generator.py"
     "packages/orchestration/cli/main.py"
-    "packages/data_pipeline/airflow_dags/data_pipeline_example_job.py"
+    "packages/pipeline_processing/airflow_dags/pipeline_processing_example_job.py"
     "packages/reporting_seeder/airflow_dags/reporting_seeder_refresh_all.py"
 )
 
@@ -176,5 +176,5 @@ echo ""
 echo "Next steps:"
 echo "  1. Review documentation in docs/airflow/"
 echo "  2. Deploy infrastructure following DEPLOYMENT.md"
-echo "  3. Test with example DAGs from data_pipeline"
+echo "  3. Test with example DAGs from pipeline_processing"
 echo ""

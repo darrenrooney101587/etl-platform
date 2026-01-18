@@ -1,7 +1,7 @@
 """Thread-safe circuit breaker utility for retryable workflows.
 
 This class intentionally provides a stable compatibility surface used by older
-code (file_processing) while also exposing a modern `allow()` method used by
+code (pipeline_processing) while also exposing a modern `allow()` method used by
 newer code (reporting_seeder). It accepts either `reset_seconds` or
 `cooldown_seconds` as the cooldown parameter.
 """
@@ -18,7 +18,7 @@ module_logger = logging.getLogger(__name__)
 class CircuitBreaker:
     """Thread-safe circuit breaker with backward-compatible API.
 
-    Backwards-compatible attributes/methods (used by file_processing tests):
+    Backwards-compatible attributes/methods (used by pipeline_processing tests):
       - consecutive_failures: int
       - last_failure_time: Optional[float]
       - cooldown_seconds: int

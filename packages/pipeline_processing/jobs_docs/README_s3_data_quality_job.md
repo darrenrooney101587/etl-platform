@@ -8,15 +8,16 @@ It is invoked by the SNS listener (for real-time events) or manually via CLI.
 ### Run via Docker (Recommended)
 
 ```bash
-./packages/file_processing/scripts/commands.sh s3_data_quality_job \
+docker run --rm etl-pipeline-processing \
+  pipeline-processing run s3_data_quality_job \
   --event-json '{"Records": [{"s3": {"bucket": {"name": "my-bucket"}, "object": {"key": "my-key"}}}]}'
 ```
 
 ### Run Locally (Poetry)
 
 ```bash
-cd packages/file_processing
-PYTHONPATH=../.. poetry run python -m file_processing.cli.main run s3_data_quality_job \
+cd packages/pipeline_processing
+PYTHONPATH=../.. poetry run python -m pipeline_processing.cli.main run s3_data_quality_job \
   --event-json '{"Records": [{"s3": {"bucket": {"name": "my-bucket"}, "object": {"key": "my-key"}}}]}'
 ```
 

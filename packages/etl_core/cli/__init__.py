@@ -83,7 +83,7 @@ def main_for_package(prog: str, package_name: str) -> int:
 
     Args:
         prog: Program name used in the argparse help (e.g. 'data-pipeline').
-        package_name: Top-level package to discover jobs for (e.g. 'data_pipeline').
+        package_name: Top-level package to discover jobs for (e.g. 'pipeline_processing').
 
     Returns:
         Exit code integer.

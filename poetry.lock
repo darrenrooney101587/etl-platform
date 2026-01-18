@@ -948,9 +948,9 @@ test = ["certifi (>=2024)", "cryptography-vectors (==46.0.3)", "pretend (>=0.7)"
 test-randomorder = ["pytest-randomly"]
 
 [[package]]
-name = "data-pipeline"
+name = "pipeline-processing"
 version = "0.1.0"
-description = "Combined transforms + ingestion runtime lane"
+description = "Pipeline processing: transforms, ingestion, data quality validation, and file processing"
 optional = false
 python-versions = "^3.10"
 groups = ["main"]
@@ -959,16 +959,23 @@ develop = true
 
 [package.dependencies]
 boto3 = "^1.37"
+django = "^4.2"
 etl-core = {path = "../etl_core"}
+etl-database-schema = {git = "git@gitlab.dev-benchmarkanalytics.com:etl/etl-database-schema.git"}
+playwright = {version = "^1.40.0", optional = true}
 psycopg2-binary = "^2.9"
+pyarrow = {version = "^14.0.0", optional = true}
 python-json-logger = "^4.0"
+sendgrid = {version = "^6.11.0", optional = true}
 
 [package.extras]
-db = ["django (>=4.2,<5.0)", "etl-database-schema @ git+ssh://git@gitlab.dev-benchmarkanalytics.com/etl/etl-database-schema.git"]
+db = ["etl-database-schema", "django"]
+parquet = ["pyarrow"]
+pdf-email = ["playwright", "sendgrid"]
 
 [package.source]
 type = "directory"
-url = "packages/data_pipeline"
+url = "packages/pipeline_processing"
 
 [[package]]
 name = "defusedxml"
@@ -1230,23 +1237,6 @@ typing-extensions = {version = ">=4.6.0", markers = "python_version < \"3.13\""}
 
 [package.extras]
 test = ["pytest (>=6)"]
-
-[[package]]
-name = "file-processing"
-version = "0.1.0"
-description = "Combined fileops + data quality runtime lane"
-optional = false
-python-versions = "^3.10"
-groups = ["main"]
-files = []
-develop = true
-
-[package.dependencies]
-etl-core = {path = "../etl_core"}
-
-[package.source]
-type = "directory"
-url = "packages/file_processing"
 
 [[package]]
 name = "filelock"
@@ -2504,4 +2494,4 @@ docs = ["Sphinx", "elementpath (>=4.1.5,<5.0.0)", "jinja2", "sphinx-rtd-theme"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "bcf786f96a225d82b015d5bf50e25a881980511dbd1d042f6dd890eb4f1c70c4"
+content-hash = "08eaf4ae098c2cfb50be5690dbe58b450da772ad9dc3c3755450e1171d6b8ff1"

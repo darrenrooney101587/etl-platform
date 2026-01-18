@@ -1,5 +1,5 @@
 # Placeholder Terraform for reporting_seeder stack.
-# Mirrors file_processing pattern: cluster, IAM, namespace, deployment, scheduled job.
+# Mirrors pipeline processing pattern: cluster, IAM, namespace, deployment, scheduled job.
 
 locals {
   tags = {
@@ -25,11 +25,11 @@ locals {
 #   tags                 = local.tags
 # }
 
-# TODO: EKS cluster and node group (can reuse module from file_processing pattern)
+# TODO: EKS cluster and node group (can reuse module from pipeline processing pattern)
 # TODO: IAM roles/policies for service account
 # TODO: kubernetes_namespace
 # TODO: kubernetes_service_account
 # TODO: kubernetes_deployment for reporting-seeder
 # TODO: kubernetes_cron_job_v1 for daily refresh using var.cron_schedule
 
-# TODO: Write container_image.txt output similar to file_processing for update-image helper
+# TODO: Write container_image.txt output similar to pipeline processing for update-image helper

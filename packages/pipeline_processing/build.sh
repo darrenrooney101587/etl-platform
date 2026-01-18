@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# packages/data_pipeline/build.sh
-# Helper to build the data_pipeline Docker image from anywhere (uses repo root as build context).
+# packages/pipeline_processing/build.sh
+# Helper to build the pipeline_processing Docker image from anywhere (uses repo root as build context).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-PKG_NAME="data_pipeline"
-IMAGE_NAME="etl-data-pipeline"
+PKG_NAME="pipeline_processing"
+IMAGE_NAME="etl-pipeline-processing"
 DASHED="${PKG_NAME//_/-}"
-LOCAL_DOCKERFILE="$REPO_ROOT/packages/$PKG_NAME/${PKG_NAME}.Dockerfile"
+LOCAL_DOCKERFILE="$REPO_ROOT/packages/$PKG_NAME/${DASHED}.Dockerfile"
 ALT_DOCKERFILE="$REPO_ROOT/docker/${DASHED}.Dockerfile"
 
 if [ -f "$LOCAL_DOCKERFILE" ]; then

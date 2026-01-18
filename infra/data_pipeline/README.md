@@ -1,20 +1,20 @@
-# data_pipeline infra
+# pipeline_processing infra
 
-This folder contains infrastructure helpers for `data_pipeline` local workflows.
+This folder contains infrastructure helpers for `pipeline_processing` local workflows.
 
 ## A) Run the container locally (fast iteration)
 
-Dockerfile (module-scoped): `packages/data_pipeline/data-pipeline.Dockerfile`.
+Dockerfile (module-scoped): `packages/pipeline_processing/pipeline-processing.Dockerfile`.
 
 Build:
 ```bash
-docker build -f packages/data_pipeline/data-pipeline.Dockerfile -t data-pipeline:local .
+docker build -f packages/pipeline_processing/pipeline-processing.Dockerfile -t pipeline-processing:local .
 ```
 
 Run (example: list package CLI commands):
 ```bash
-docker run --rm -e PYTHONUNBUFFERED=1 data-pipeline:local \
-  python -m data_pipeline.cli.main list
+docker run --rm -e PYTHONUNBUFFERED=1 pipeline-processing:local \
+  python -m pipeline_processing.cli.main list
 ```
 
 ## B) LocalStack (mimic AWS actions)

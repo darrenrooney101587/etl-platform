@@ -3,7 +3,7 @@
 This folder contains helper artifacts to run a local AWS stack (SNS + S3) using LocalStack to enable local development and testing of packages in this monorepo without contacting real AWS.
 
 Perspectives
-- The monorepo contains multiple perspectives (projects): `file_processing`, `data_pipeline`, and `observability`.
+- The monorepo contains multiple perspectives (projects): `pipeline_processing` and `observability`.
 - This setup supports configuring LocalStack resources scoped per perspective so tests and local integrations remain isolated.
 
 This folder contains:
@@ -28,10 +28,7 @@ docker-compose -f docker/docker-compose.yml up -d
 
 ```bash
 # From repo root (preferred)
-infra/local/scripts/setup_localstack.sh host.docker.internal 8080 file_processing
-
-# for data_pipeline perspective
-infra/local/scripts/setup_localstack.sh host.docker.internal 8080 data_pipeline
+infra/local/scripts/setup_localstack.sh host.docker.internal 8080 pipeline_processing
 
 # for observability perspective
 infra/local/scripts/setup_localstack.sh host.docker.internal 8080 observability
@@ -43,9 +40,9 @@ The script will create an S3 bucket named `etl-<perspective>-client-etl` and an 
 
 ```bash
 EDGE=http://localhost:4566
-# Example ARN for file_processing perspective created by the setup script
-TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:file_processing-topic
-aws --endpoint-url="$EDGE" sns publish --topic-arn "$TOPIC_ARN" --message '{"Records":[{"s3":{"bucket":{"name":"etl-file_processing-client-etl"},"object":{"key":"from_client/nm_albuquerque/organizations/Officer_Detail.csv"}}}]}'
+# Example ARN for pipeline_processing perspective created by the setup script
+TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:pipeline_processing-topic
+aws --endpoint-url="$EDGE" sns publish --topic-arn "$TOPIC_ARN" --message '{"Records":[{"s3":{"bucket":{"name":"etl-pipeline_processing-client-etl"},"object":{"key":"from_client/nm_albuquerque/organizations/Officer_Detail.csv"}}}]}'
 ```
 
 Notes
@@ -57,19 +54,6 @@ Notes
 
 To make it easy to create LocalStack resources for a specific package/perspective, small wrapper scripts are provided under `infra/<perspective>/scripts/` that call the central `infra/local/scripts/setup_localstack.sh` with the perspective argument.
 
-Available wrappers (examples):
-
-- `infra/file_processing/scripts/setup_localstack.sh` — prepare LocalStack for the `file_processing` perspective
-- `infra/data_pipeline/scripts/setup_localstack.sh` — prepare LocalStack for the `data_pipeline` perspective
-
-Usage (examples):
-
-```bash
-# File processing (default resources)
-infra/file_processing/scripts/setup_localstack.sh host.docker.internal 8080
-
-# Data pipeline
-infra/data_pipeline/scripts/setup_localstack.sh host.docker.internal 8080
-```
+Available wrappers follow the pattern `infra/<perspective>/scripts/setup_localstack.sh` and call the central setup script with the matching perspective.
 
 These wrappers are thin and only provide a simpler developer UX; they call `infra/local/scripts/setup_localstack.sh` with the correct perspective.

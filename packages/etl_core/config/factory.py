@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from packages.data_pipeline.processors.employment_history_processor import EmploymentHistoryProcessor
+from packages.pipeline_processing.processors.employment_history_processor import EmploymentHistoryProcessor
 from packages.etl_core.config import S3Config
 from packages.etl_core.config.config import EmploymentHistoryConfig
 from packages.etl_core.processors.s3_file_processor import S3FileProcessor

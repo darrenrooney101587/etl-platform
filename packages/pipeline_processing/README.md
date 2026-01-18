@@ -14,9 +14,9 @@ Pipeline processing package combining transforms, ingestion, data quality valida
 
 ## Package History
 
-This package is the result of merging two packages:
-- `data_pipeline` - Combined transforms + ingestion runtime lane
-- `file_processing` - Data quality validation and file processing pipeline
+This package is the result of merging two runtime lanes:
+- Transforms + ingestion runtime
+- Data quality validation and file processing
 
 Both packages have been consolidated into `pipeline_processing` to better reflect the high-level data engineering concerns alongside other major facets (observability, orchestration, etl_core).
 
@@ -119,7 +119,7 @@ Avoid `docker exec` for jobs
 
 Running the module directly
 - If there is a need to run without an installed console script, the module
-  can be run with Python: `python -m data_pipeline.cli.get_s3_files --help`.
+  can be run with Python: `python -m pipeline_processing.cli.get_s3_files --help`.
 
 ## How to run locally
 
@@ -127,17 +127,17 @@ Running the module directly
 
 ```bash
 poetry install --extras db
-poetry run data-pipeline-get-s3-files --help
+poetry run pipeline-processing-get-s3-files --help
 ```
 
 ### Docker (build & run example)
 
 ```bash
 # Build from repository root (module Dockerfile builds package into image)
-docker build -f docker/data-pipeline.Dockerfile -t etl-data-pipeline .
+docker build -f packages/pipeline_processing/pipeline-processing.Dockerfile -t etl-pipeline-processing .
 
 # Run preferred ENTRYPOINT form (pass only args)
-docker run --rm etl-data-pipeline \
+docker run --rm etl-pipeline-processing \
   --agency-id 10 \
   --source-bucket benchmarkanalytics-production-env-userdocument-test \
   --destination-bucket etl-ba-research-client-etl
@@ -145,9 +145,9 @@ docker run --rm etl-data-pipeline \
 
 ## Adding a job
 
-Follow these guidelines when adding a new job under `packages/data_pipeline/jobs`:
+Follow these guidelines when adding a new job under `packages/pipeline_processing/jobs`:
 
-1. Create a module file named `packages/data_pipeline/jobs/<job_name>.py`.
+1. Create a module file named `packages/pipeline_processing/jobs/<job_name>.py`.
 2. Expose the job using the single supported convention:
     - The module MUST provide a top-level `JOB` variable as a lightweight tuple: `(entrypoint, description)`.
         - `entrypoint` is a callable `entrypoint(argv: List[str]) -> int`.
@@ -160,12 +160,12 @@ Follow these guidelines when adding a new job under `packages/data_pipeline/jobs
    tuple avoids importing registry types inside job modules and prevents circular
    import issues.
 3. Keep the job focused: the job module should only wire up CLI parsing and call into business logic modules under
-   `packages/data_pipeline` (or `etl_core` for shared utilities).
+   `packages/pipeline_processing` (or `etl_core` for shared utilities).
 4. Use constructor injection and small functions/classes for external resources (S3 clients, DB clients). Default to
    production implementations but allow test injection.
-5. Add unit tests with `unittest.TestCase` under `packages/data_pipeline/tests/unit` and mock external resources.
+5. Add unit tests with `unittest.TestCase` under `packages/pipeline_processing/tests/unit` and mock external resources.
 
-Minimal job template (copy into `packages/data_pipeline/jobs/my_job.py`):
+Minimal job template (copy into `packages/pipeline_processing/jobs/my_job.py`):
 
 ```python
 """Example job: normalize agency records."""
@@ -175,7 +175,7 @@ from typing import List
 
 def _run(agency_id: int, dry_run: bool) -> int:
     """Business logic entry — keep this small and testable."""
-    # ... call into your business modules in packages/data_pipeline/... or etl_core
+    # ... call into your business modules in packages/pipeline_processing/... or etl_core
     print(f"Running normalize for agency={agency_id} dry_run={dry_run}")
     return 0
 
@@ -194,17 +194,17 @@ JOB = (entrypoint, "Normalize agency records")
 
 Notes on naming and discovery
 
-- The registry discovers any module under `data_pipeline.jobs` (except modules starting with `_` and `registry`).
+- The registry discovers any module under `pipeline_processing.jobs` (except modules starting with `_` and `registry`).
 - The import-time behavior should be safe: avoid heavy side-effects at import time — do initialization inside the
   entrypoint or _run function.
 
 ## Running jobs at scale (best practices)
 
 1. Single image, many jobs
-    - Build one container image that installs `packages/data_pipeline` and `etl_core`.
-    - Set the container ENTRYPOINT to the console script `data-pipeline` (this is how the current Dockerfile is
+    - Build one container image that installs `packages/pipeline_processing` and `etl_core`.
+    - Set the container ENTRYPOINT to the console script `pipeline-processing` (this is how the current Dockerfile is
       written).
-    - Use `data-pipeline run <job_name> -- <job args...>` as the command for the Kubernetes Job. This keeps images
+    - Use `pipeline-processing run <job_name> -- <job args...>` as the command for the Kubernetes Job. This keeps images
       stable and makes manifests small.
 
 2. K8s Job patterns
@@ -221,8 +221,8 @@ spec:
       restartPolicy: Never
       containers:
         - name: normalize
-          image: ghcr.example.com/your-org/etl-data-pipeline:latest
-          command: [ "data-pipeline", "run", "my_job", "--", "--agency-id", "123" ]
+          image: ghcr.example.com/your-org/etl-pipeline-processing:latest
+          command: [ "pipeline-processing", "run", "my_job", "--", "--agency-id", "123" ]
       backoffLimit: 1
 ```
 
@@ -248,17 +248,17 @@ spec:
 
 ## Quick checklist when adding a new job
 
-- [ ] New file `packages/data_pipeline/jobs/<job_name>.py` created and discovery-safe
+- [ ] New file `packages/pipeline_processing/jobs/<job_name>.py` created and discovery-safe
 - [ ] Exposes `JOB`
 - [ ] No heavy import-time side-effects
-- [ ] Unit tests added under `packages/data_pipeline/tests/unit`
-- [ ] Docker image runs `data-pipeline` as ENTRYPOINT and manifest uses `run <job_name>`
+- [ ] Unit tests added under `packages/pipeline_processing/tests/unit`
+- [ ] Docker image runs `pipeline-processing` as ENTRYPOINT and manifest uses `run <job_name>`
 
 ## Jobs vs Processors — conceptual separation
 
-When developing in `packages/data_pipeline`, two primary abstractions are used: "jobs" and "processors". Keeping the distinction clear improves testability, ownership, and scale.
+When developing in `packages/pipeline_processing`, two primary abstractions are used: "jobs" and "processors". Keeping the distinction clear improves testability, ownership, and scale.
 
-- Job (location: `packages/data_pipeline/jobs`)
+- Job (location: `packages/pipeline_processing/jobs`)
   - Purpose: orchestration and operational concerns. A job wires together configuration, repositories, processors, and adapters; it parses CLI args, composes resources, and maps results to exit codes and human-friendly output.
   - Characteristics:
     - Small module with a single public entrypoint (see `JOB = (entrypoint, description)` convention).
@@ -271,7 +271,7 @@ When developing in `packages/data_pipeline`, two primary abstractions are used: 
     - Calling processor methods to copy files and upload metadata.
     - Aggregating results and returning a process exit code.
 
-- Processor (location: `packages/data_pipeline/processors` or `packages/etl_core/processors`)
+- Processor (location: `packages/pipeline_processing/processors` or `packages/etl_core/processors`)
   - Purpose: encapsulate focused, reusable business logic and operations (for example: S3 file copying, employment history CSV creation and upload).
   - Characteristics:
     - Implemented as classes or small modules with clear public methods (for example `process_files`, `fetch_data`, `upload_to_s3`).
@@ -285,7 +285,7 @@ When developing in `packages/data_pipeline`, two primary abstractions are used: 
 - Why this separation helps
 
   - Testability: processors are easy to unit test by injecting fake S3/DB clients; jobs can be tested by injecting fake processors and repositories.
-  - Ownership: domain SQL and data-shaping lives in package-level repositories (e.g. `packages/data_pipeline/repositories`) instead of `etl_core` (which stays generic).
+  - Ownership: domain SQL and data-shaping lives in package-level repositories (e.g. `packages/pipeline_processing/repositories`) instead of `etl_core` (which stays generic).
   - Reuse: processors implement mechanics once and are used by many jobs (reduces duplication).
   - Operations: Jobs remain thin and focus on logging, retries policy, and mapping to orchestration systems (K8s exit codes, metrics), making them safer to run at scale.
 
@@ -310,8 +310,8 @@ Testing guidance
 
 Quick checklist for adding a Processor
 
-- [ ] Add class under `packages/data_pipeline/processors` (or `etl_core/processors` if generic)
+- [ ] Add class under `packages/pipeline_processing/processors` (or `etl_core/processors` if generic)
 - [ ] Accept `config` dataclass + client dependencies in constructor
 - [ ] Keep public methods small and side-effects explicit
-- [ ] Add unit tests in `packages/data_pipeline/tests/unit`
+- [ ] Add unit tests in `packages/pipeline_processing/tests/unit`
 - [ ] Document the processor in the job README if it is job-specific

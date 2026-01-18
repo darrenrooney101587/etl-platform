@@ -179,12 +179,12 @@ def main() -> int:
     gen_parser.add_argument(
         "--package-name",
         required=True,
-        help="Package name (e.g., data_pipeline)",
+        help="Package name (e.g., pipeline_processing)",
     )
     gen_parser.add_argument(
         "--dag-id",
         required=True,
-        help="Unique DAG ID (e.g., data_pipeline_example)",
+        help="Unique DAG ID (e.g., pipeline_processing_example)",
     )
     gen_parser.add_argument(
         "--job-name",
@@ -194,7 +194,7 @@ def main() -> int:
     gen_parser.add_argument(
         "--image-tag",
         required=True,
-        help="Full container image with tag (e.g., 123456.dkr.ecr.../data-pipeline:v1.0.0)",
+        help="Full container image with tag (e.g., 123456.dkr.ecr.../pipeline-processing:v1.0.0)",
     )
     gen_parser.add_argument(
         "--output",

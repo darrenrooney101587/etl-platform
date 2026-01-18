@@ -13,7 +13,7 @@ This document describes the architecture for deploying Airflow DAGs from indepen
 
 ## Overview
 
-The ETL platform uses **S3-based DAG distribution** to enable independent package deployments. This pattern allows each package (e.g., `data_pipeline`, `reporting_seeder`) to register new Airflow jobs without rebuilding or redeploying the Airflow control plane.
+The ETL platform uses **S3-based DAG distribution** to enable independent package deployments. This pattern allows each package (e.g., `pipeline_processing`, `reporting_seeder`) to register new Airflow jobs without rebuilding or redeploying the Airflow control plane.
 
 ### Key Principles
 
@@ -61,7 +61,7 @@ The ETL platform uses **S3-based DAG distribution** to enable independent packag
 ┌─────────────────────────────────▼─────────────────────────────┐
 │                      EKS etl-jobs Namespace                   │
 │  ┌──────────────────┐       ┌──────────────────────────┐     │
-│  │  data-pipeline   │       │  reporting-seeder        │     │
+│  │  pipeline-processing   │       │  reporting-seeder        │     │
 │  │  Job Pod         │       │  Job Pod                 │     │
 │  │  (runs once)     │       │  (runs once)             │     │
 │  └──────────────────┘       └──────────────────────────┘     │
@@ -77,10 +77,9 @@ The ETL platform uses **S3-based DAG distribution** to enable independent packag
 **Structure**:
 ```
 s3://<bucket>/<env>/
-├── data_pipeline/
+├── pipeline_processing/
 │   ├── dags/
-│   │   ├── data_pipeline_example_job.py
-│   │   └── data_pipeline_agency_data.py
+│   │   └── pipeline_processing_example_job.py
 │   └── metadata.json (optional)
 └── reporting_seeder/
     ├── dags/
@@ -140,29 +139,29 @@ s3://<bucket>/<env>/
 ```bash
 # Generate a DAG file
 airflow-dag-publisher generate \
-  --package-name data_pipeline \
-  --dag-id data_pipeline_example \
+  --package-name pipeline_processing \
+  --dag-id pipeline_processing_example \
   --job-name example_job \
-  --image-tag 123.dkr.ecr.../data-pipeline:v1.0.0 \
+  --image-tag 123.dkr.ecr.../pipeline-processing:v1.0.0 \
   --output /tmp/dag.py
 
 # Validate a DAG file
 airflow-dag-publisher validate \
-  --package-name data_pipeline \
+  --package-name pipeline_processing \
   --dag-file /path/to/dag.py
 
 # Publish DAGs to S3
 airflow-dag-publisher publish \
   --bucket etl-airflow-dags-dev \
   --environment dev \
-  --package-name data_pipeline \
+  --package-name pipeline_processing \
   --dag-path ./airflow_dags
 
 # List published DAGs
 airflow-dag-publisher list \
   --bucket etl-airflow-dags-dev \
   --environment dev \
-  --package-name data_pipeline
+  --package-name pipeline_processing
 ```
 
 ## DAG Distribution Flow

@@ -160,9 +160,9 @@ Open http://localhost:8080.
 ```
 s3://etl-airflow-dags-<env>/
 └── <env>/
-    ├── data_pipeline/
+    ├── pipeline_processing/
     │   ├── dags/
-    │   │   └── data_pipeline_example.py
+    │   │   └── pipeline_processing_example_job.py
     │   └── metadata.json
     └── reporting_seeder/
         ├── dags/

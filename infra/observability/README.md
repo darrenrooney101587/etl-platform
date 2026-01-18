@@ -2,7 +2,7 @@
 
 This stack manages infrastructure needed to run the `observability` module (job-driven notification backend).
 
-It follows the same workflow shape as `infra/file_processing`:
+It follows the same workflow shape as the pipeline processing infra stack:
 - local Docker run for fast iteration
 - LocalStack helpers for AWS-mocking workflows
 - manual push + deploy into the `etl-playground` AWS account

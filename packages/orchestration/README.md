@@ -26,12 +26,12 @@ Create a DAG file using the KubernetesPodOperator template:
 
 ```bash
 airflow-dag-publisher generate \
-  --package-name data_pipeline \
-  --dag-id data_pipeline_example_job \
+  --package-name pipeline_processing \
+  --dag-id pipeline_processing_example_job \
   --job-name example_job \
-  --image-tag 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/data-pipeline:v1.0.0 \
-  --output /tmp/data_pipeline_example_job.py \
-  --description "Run example_job from data_pipeline" \
+  --image-tag 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/pipeline-processing:v1.0.0 \
+  --output /tmp/pipeline_processing_example_job.py \
+  --description "Run example_job from pipeline_processing" \
   --schedule "@daily" \
   --namespace etl-jobs
 ```
@@ -76,8 +76,8 @@ Check DAG syntax and conventions:
 
 ```bash
 airflow-dag-publisher validate \
-  --package-name data_pipeline \
-  --dag-file packages/data_pipeline/airflow_dags/data_pipeline_example_job.py
+  --package-name pipeline_processing \
+  --dag-file packages/pipeline_processing/airflow_dags/pipeline_processing_example_job.py
 ```
 
 Validation checks:
@@ -95,8 +95,8 @@ Upload DAG files to S3 for Airflow discovery:
 airflow-dag-publisher publish \
   --bucket etl-airflow-dags-dev \
   --environment dev \
-  --package-name data_pipeline \
-  --dag-path packages/data_pipeline/airflow_dags
+  --package-name pipeline_processing \
+  --dag-path packages/pipeline_processing/airflow_dags
 ```
 
 #### Publish a Single File
@@ -105,8 +105,8 @@ airflow-dag-publisher publish \
 airflow-dag-publisher publish \
   --bucket etl-airflow-dags-dev \
   --environment dev \
-  --package-name data_pipeline \
-  --dag-path packages/data_pipeline/airflow_dags/data_pipeline_example_job.py
+  --package-name pipeline_processing \
+  --dag-path packages/pipeline_processing/airflow_dags/pipeline_processing_example_job.py
 ```
 
 #### Skip Validation
@@ -115,8 +115,8 @@ airflow-dag-publisher publish \
 airflow-dag-publisher publish \
   --bucket etl-airflow-dags-dev \
   --environment dev \
-  --package-name data_pipeline \
-  --dag-path packages/data_pipeline/airflow_dags \
+  --package-name pipeline_processing \
+  --dag-path packages/pipeline_processing/airflow_dags \
   --no-validate
 ```
 
@@ -128,7 +128,7 @@ View DAGs published by a package:
 airflow-dag-publisher list \
   --bucket etl-airflow-dags-dev \
   --environment dev \
-  --package-name data_pipeline
+  --package-name pipeline_processing
 ```
 
 ## DAG Naming Convention
@@ -141,7 +141,7 @@ DAG IDs **must** follow this pattern:
 
 Examples:
 
-- ✅ `data_pipeline_example_job`
+- ✅ `pipeline_processing_example_job`
 - ✅ `reporting_seeder_refresh_all`
 - ✅ `observability_s3_metrics`
 - ❌ `example_job` (missing package prefix)
@@ -167,10 +167,9 @@ Example:
 
 ```
 s3://etl-airflow-dags-dev/dev/
-├── data_pipeline/
+├── pipeline_processing/
 │   └── dags/
-│       ├── data_pipeline_example_job.py
-│       └── data_pipeline_agency_data.py
+│       └── pipeline_processing_example_job.py
 └── reporting_seeder/
     └── dags/
         ├── reporting_seeder_refresh_all.py

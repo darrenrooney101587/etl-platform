@@ -14,11 +14,11 @@ spec:
       restartPolicy: Never
       containers:
         - name: file-processing
-          image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/file-processing:latest
+          image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/pipeline-processing:latest
           command:
             - python
             - -m
-            - file_processing.cli.main
+            - pipeline_processing.cli.main
             - run
             - hello_world
           envFrom:
@@ -28,7 +28,7 @@ spec:
                 name: file-processing-secret
           env:
             - name: DJANGO_SETTINGS_MODULE
-              value: "file_processing.settings"
+              value: "pipeline_processing.settings"
             - name: PORT
               value: "8080"
           # No probes for job

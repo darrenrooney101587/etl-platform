@@ -16,9 +16,9 @@ docker-compose -f compose/docker-compose.yml up -d --build
 Build only a specific service (useful for debugging):
 
 ```bash
-docker-compose -f compose/docker-compose.yml build file-processing
+docker-compose -f compose/docker-compose.yml build pipeline-processing
 # or run with build and show logs
-docker-compose -f compose/docker-compose.yml up --build file-processing
+docker-compose -f compose/docker-compose.yml up --build pipeline-processing
 ```
 
 Package-local helpers
@@ -30,8 +30,7 @@ Example:
 ```bash
 # from anywhere
 packages/observability/build.sh
-packages/file_processing/build.sh
-packages/data_pipeline/build.sh
+packages/pipeline_processing/build.sh
 packages/reporting_seeder/build.sh
 ```
 

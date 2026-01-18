@@ -24,8 +24,8 @@ spec:
       serviceAccountName: file-processing
       containers:
         - name: sns-listener
-          image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/file-processing:latest
-          command: ["python", "-m", "file_processing.cli.main", "run", "sns_listener"]
+          image: 270022076279.dkr.ecr.us-gov-west-1.amazonaws.com/pipeline-processing:latest
+          command: ["python", "-m", "pipeline_processing.cli.main", "run", "sns_listener"]
           envFrom:
             - configMapRef:
                 name: file-processing-config
@@ -33,7 +33,7 @@ spec:
                 name: file-processing-secret
           env:
             - name: DJANGO_SETTINGS_MODULE
-              value: "file_processing.settings"
+              value: "pipeline_processing.settings"
             - name: PORT
               value: "8080"
           ports:

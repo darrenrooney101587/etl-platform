@@ -9,8 +9,7 @@ package-mode = false
 python = "^3.10"
 # Local path dependencies for development convenience
 etl-core = { path = "./packages/etl_core", develop = true }
-file-processing = { path = "./packages/file_processing", develop = true }
-data-pipeline = { path = "./packages/data_pipeline", develop = true }
+pipeline-processing = { path = "./packages/pipeline_processing", develop = true }
 observability = { path = "./packages/observability", develop = true }
 boto3-stubs = "~=1.42.19"
 

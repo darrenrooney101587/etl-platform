@@ -14,15 +14,11 @@ Modules
 - Purpose: Pure Python shared utilities for ETL runtimes (config, logging, metrics, S3 helpers, retry helpers).
 - Dependencies: None (pure Python).
 
-2. `file_processing`
-- Purpose: File operations + data quality and profiling runtime.
-- Dependencies: `etl_core`.
-
-3. `data_pipeline`
-- Purpose: Transforms, enrichment and ingestion jobs.
+2. `pipeline_processing`
+- Purpose: Transforms, enrichment, ingestion jobs, and file processing workflows.
 - Dependencies: `etl_core`, `etl-database-schema` (optional).
 
-4. `observability`
+3. `observability`
 - Purpose: Platform monitoring and freshness/health checks.
 - Dependencies: `etl_core`, `etl-database-schema` (optional).
 

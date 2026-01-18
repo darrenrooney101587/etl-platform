@@ -1,7 +1,7 @@
 """Generic S3 client utilities moved into etl_core.
 
-This is a near-copy of the implementation previously in data_pipeline.s3.client
-with imports and type references adjusted to reference etl_core.config.S3Config.
+This is a near-copy of the implementation previously in the pipeline processing
+package with imports and type references adjusted to reference etl_core.config.S3Config.
 """
 from __future__ import annotations
 

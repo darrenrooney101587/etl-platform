@@ -1,4 +1,4 @@
-# file_processing infra
+# pipeline_processing infra
 
 > **Quick Start (2 steps):**
 >
@@ -8,7 +8,7 @@
 > ./scripts/manage.sh apply
 > ```
 >
-> 2) Provision the `file_processing` EKS cluster + SNS wiring + Kubernetes resources:
+> 2) Provision the `pipeline_processing` EKS cluster + SNS wiring + Kubernetes resources:
 > ```bash
 > # Init the terraform working directory and create resources
 > cd infra/file_processing
@@ -22,7 +22,7 @@
 > ./scripts/manage.sh update-image
 > ```
 >
-> Tear down the `file_processing` cluster and app resources:
+> Tear down the `pipeline_processing` cluster and app resources:
 > ```bash
 > cd infra/file_processing
 > ./scripts/manage.sh destroy
@@ -33,11 +33,11 @@
 ### A) Run the container locally (fast iteration)
 
 The module Dockerfile lives under the package:
-- `packages/file_processing/file-processing.Dockerfile`
+- `packages/pipeline_processing/pipeline-processing.Dockerfile`
 
 Build it:
 ```bash
-docker build -f packages/file_processing/file-processing.Dockerfile -t file-processing:local .
+docker build -f packages/pipeline_processing/pipeline-processing.Dockerfile -t pipeline-processing:local .
 ```
 
 Run the SNS listener locally:
@@ -45,8 +45,8 @@ Run the SNS listener locally:
 docker run --rm -p 8080:8080 \
   -e PYTHONUNBUFFERED=1 \
   -e PORT=8080 \
-  file-processing:local \
-  python -m file_processing.cli.sns_main
+  pipeline-processing:local \
+  python -m pipeline_processing.cli.sns_main
 ```
 
 ### B) LocalStack (mimic AWS actions)
@@ -85,7 +85,7 @@ Notes:
 - This stack uses `aws_profile` / `aws_region` from `infra/file_processing/terraform/terraform.tfvars` (defaults: `etl-playground`, `us-gov-west-1`).
 - `./scripts/ecr_put.sh` pushes the image URI referenced in `infra/file_processing/terraform/container_image.txt`.
 
-This directory provisions a dedicated **EKS cluster** for the `file_processing` runtime plus the AWS wiring it needs (SNS topic and optional S3 bucket notifications). It is designed to run **after** `infra/foundation_network`, which owns the shared VPC/subnets/NAT/IGW.
+This directory provisions a dedicated **EKS cluster** for the `pipeline_processing` runtime plus the AWS wiring it needs (SNS topic and optional S3 bucket notifications). It is designed to run **after** `infra/foundation_network`, which owns the shared VPC/subnets/NAT/IGW.
 
 ---
 
@@ -246,7 +246,7 @@ spec:
       containers:
       - name: file-processing
         image: example.com/etl-file-processing:latest
-        command: ["python", "-m", "file_processing.cli.main"]
+        command: ["python", "-m", "pipeline_processing.cli.main"]
         args: ["run", "s3_data_quality_job", "--event-json", "<EVENT_JSON>"]
         envFrom:
         - secretRef:
@@ -291,7 +291,7 @@ spec:
       - name: sns-listener
         image: example.com/etl-file-processing:latest
         command: ["python"]
-        args: ["-m", "file_processing.cli.sns_main"]
+        args: ["-m", "pipeline_processing.cli.sns_main"]
         ports:
         - containerPort: 8080
         env:
@@ -330,7 +330,7 @@ Prefer IRSA to avoid long-lived AWS keys in secrets.
 To configure SNS -> HTTPS -> cluster:
 1. Expose the SNS listener via an HTTPS load balancer / Ingress with a stable public DNS name.
 2. In the AWS SNS topic console, create a subscription with protocol `HTTPS` and endpoint `https://<your-host>/`.
-3. SNS will send a `SubscriptionConfirmation` message to your endpoint. The `file_processing` SNS listener auto-confirms by visiting the `SubscribeURL`.
+3. SNS will send a `SubscriptionConfirmation` message to your endpoint. The `pipeline_processing` SNS listener auto-confirms by visiting the `SubscribeURL`.
 4. After subscription is confirmed, `Notification` POSTs will be delivered to the listener. The listener wraps the SNS envelope and forwards it to the job processor.
 
 Security:
@@ -352,7 +352,7 @@ Alternative: skip SNS and run the job directly with an event JSON:
 poetry run file-processing run s3_data_quality_job -- --event-json '{"Records":[{"s3":{"bucket":{"name":"ignored"},"object":{"key":"from_client/nm_albuquerque/Officer_Detail.csv"}}}]}' --dry-run
 ```
 
-Set `LOCAL_S3_ROOT=./data` in `packages/file_processing/.env` to have the job read local files instead of S3.
+Set `LOCAL_S3_ROOT=./data` in `packages/pipeline_processing/.env` to have the job read local files instead of S3.
 
 ## Local dev — LocalStack + local listener (recommended for fast iteration)
 
@@ -361,7 +361,7 @@ This repository includes helpers to run a full local SNS/S3 stack using LocalSta
 Summary:
 - `infra/local` contains shared local plumbing for LocalStack (docker-compose and central setup script).
 - Per‑perspective wrappers live in `infra/<perspective>/setup_localstack.sh` (for example `infra/file_processing/setup_localstack.sh`).
-- The local HTTP listener is `packages/file_processing/cli/sns_main.py` and the helper runner is `packages/file_processing/scripts/run_local_listener.sh`.
+- The local HTTP listener is `packages/pipeline_processing/cli/sns_main.py` and the helper runner is `packages/pipeline_processing/scripts/run_local_listener.sh`.
 
 Quick start (copy/paste):
 
@@ -386,9 +386,9 @@ This creates an S3 bucket named `etl-file-processing-client-etl` and an SNS topi
 
 ```bash
 # from repo root
-packages/file_processing/scripts/run_local_listener.sh 8080
+packages/pipeline_processing/scripts/run_local_listener.sh 8080
 # or directly
-python -m file_processing.cli.sns_main
+python -m pipeline_processing.cli.sns_main
 ```
 
 The listener binds to all interfaces (0.0.0.0) so the LocalStack container can reach it via `host.docker.internal` on macOS.
@@ -430,14 +430,13 @@ Troubleshooting (common issues)
 
 - `Address already in use` when starting the listener:
   - Find and stop the process using the port: `lsof -nP -iTCP:8080 -sTCP:LISTEN`
-  - Or start the listener on another port and re-run the setup wrapper with that port: `infra/file_processing/scripts/setup_localstack.sh host.docker.internal 8090` and `packages/file_processing/scripts/run_local_listener.sh 8090`.
+- Or start the listener on another port and re-run the setup wrapper with that port: `infra/file_processing/scripts/setup_localstack.sh host.docker.internal 8090` and `PORT=8090 poetry run pipeline-processing run sns_listener`.
 
 - If TLS/hostname mismatch warnings appear, the setup script uses `--no-verify-ssl` for LocalStack HTTPS; to avoid disabling verification, map a LocalStack hostname (for example `localhost.localstack.cloud`) to `127.0.0.1` and set `LOCALSTACK_HOSTNAME` so cert SANs match.
 
 Per‑perspective wrappers
 
-- `infra/file_processing/scripts/setup_localstack.sh` — calls the central `infra/local/scripts/setup_localstack.sh` with the `file_processing` perspective.
-- `infra/data_pipeline/setup_localstack.sh` — similar wrapper for `data_pipeline`.
+- `infra/file_processing/scripts/setup_localstack.sh` — calls the central `infra/local/scripts/setup_localstack.sh` with the `pipeline_processing` perspective.
 
 Production mapping reminder
 
@@ -454,8 +453,8 @@ Location: `infra/file_processing/scripts/`
 
 Scripts provided (summary):
 
-- `manage.sh` — Primary entrypoint for the `file_processing` Terraform stack.
-  - What it does: manage the file_processing Terraform stack (EKS + SNS + K8s) and support image updates.
+- `manage.sh` — Primary entrypoint for the `pipeline_processing` Terraform stack.
+  - What it does: manage the pipeline_processing Terraform stack (EKS + SNS + K8s) and support image updates.
   - Commands:
     - `init` — terraform init
     - `plan` — terraform plan
@@ -492,7 +491,7 @@ Scripts provided (summary):
 - `sns_subscribe.sh` — Create an SNS subscription for an HTTP endpoint.
   - Example:
     ```bash
-    SNS_TOPIC_ARN=arn:aws-us-gov:sns:us-gov-west-1:270022076279:file-processing-topic ENDPOINT=https://<your-host>/ AWS_PROFILE=etl-playground ./scripts/sns_subscribe.sh
+    SNS_TOPIC_ARN=arn:aws-us-gov:sns:us-gov-west-1:270022076279:pipeline-processing-topic ENDPOINT=https://<your-host>/ AWS_PROFILE=etl-playground ./scripts/sns_subscribe.sh
     ```
 
 - `sns_probe_listener.sh` — Quick helper to list subscriptions for a topic (used to verify listener subscription state).
@@ -517,5 +516,5 @@ Notes and best practices
 
 ## Troubleshooting
 
-- "ModuleNotFoundError: No module named 'file_processing'" in containers: verify `PYTHONPATH=/app/packages` and ensure the container image was built from repo root so `packages/` were copied into the image.
+- "ModuleNotFoundError: No module named 'pipeline_processing'" in containers: verify `PYTHONPATH=/app/packages` and ensure the container image was built from repo root so `packages/` were copied into the image.
 - If SNS delivery fails, check Access Logs on the ALB/Ingress and the listener logs for subscription confirmation errors.

@@ -3,14 +3,14 @@ set -euo pipefail
 
 # setup_localstack.sh
 # Bring up LocalStack and create SNS topic, S3 bucket, and subscribe the HTTP endpoint.
-# This script is perspective-aware for monorepo layouts: file_processing, data_pipeline, observability.
+# This script is perspective-aware for monorepo layouts: pipeline_processing, observability.
 
 # Usage: ./setup_localstack.sh <listener_host> <listener_port> [perspective]
-# Example: ./setup_localstack.sh host.docker.internal 8080 file_processing
+# Example: ./setup_localstack.sh host.docker.internal 8080 pipeline_processing
 
 LISTENER_HOST=${1:-host.docker.internal}
 LISTENER_PORT=${2:-8080}
-PERSPECTIVE=${3:-file_processing}
+PERSPECTIVE=${3:-pipeline_processing}
 AWS_REGION=${AWS_REGION:-us-east-1}
 
 # Prefer HTTPS edge, fall back to HTTP if necessary
@@ -18,11 +18,11 @@ EDGE_URLS=("https://localhost:4566" "http://localhost:4566")
 
 # Normalize perspective -> use allowed set
 case "$PERSPECTIVE" in
-  file_processing|data_pipeline|observability)
+  pipeline_processing|observability)
     ;;
   *)
     echo "Unknown perspective: $PERSPECTIVE"
-    echo "Valid perspectives: file_processing, data_pipeline, observability"
+    echo "Valid perspectives: pipeline_processing, observability"
     exit 1
     ;;
 esac

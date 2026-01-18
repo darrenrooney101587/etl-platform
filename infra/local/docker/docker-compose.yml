@@ -20,7 +20,7 @@ services:
     command: >
       set -euo pipefail
       EDGE_URL=http://localstack:4566
-      PERSPECTIVE=${PERSPECTIVE:-file_processing}
+      PERSPECTIVE=${PERSPECTIVE:-pipeline_processing}
       LISTENER_HOST=${LISTENER_HOST:-host.docker.internal}
       LISTENER_PORT=${LISTENER_PORT:-8080}
       for i in 1 2 3 4 5; do
@@ -45,7 +45,7 @@ services:
       echo "Localstack init complete for perspective: $PERSPECTIVE"
     environment:
       - AWS_DEFAULT_REGION=us-east-1
-      - PERSPECTIVE=file_processing
+      - PERSPECTIVE=pipeline_processing
       - LISTENER_HOST=host.docker.internal
       - LISTENER_PORT=8080
     restart: "no"

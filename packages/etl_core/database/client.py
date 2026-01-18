@@ -11,7 +11,7 @@ class DatabaseClient:
     Responsibilities:
     - Provide a minimal, DI-friendly API for executing SQL and returning dict rows.
     - Avoid embedding domain-specific SQL. Domain repositories should live in
-      package-level repositories (for example, `packages/data_pipeline/repositories`).
+      package-level repositories (for example, `packages/pipeline_processing/repositories`).
 
     Construction:
       - Pass an existing DB connection via `connection` for tests, or
@@ -104,7 +104,7 @@ class DatabaseClient:
         """Execute a SQL query and return rows as dictionaries.
 
         This is the only query surface etl_core exposes; domain SQL must live in
-        package-level repositories (for example, `packages/data_pipeline/repositories`).
+        package-level repositories (for example, `packages/pipeline_processing/repositories`).
 
         Args:
             sql: SQL statement to execute.

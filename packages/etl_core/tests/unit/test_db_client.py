@@ -1,5 +1,5 @@
 """
-Unit tests for the DatabaseClient in data_pipeline.database.client.
+Unit tests for the DatabaseClient used by pipeline_processing.
 
 These tests focus on database query functionality and data processing utilities
 exposed by the DatabaseClient methods, using injected mock connections for isolation.
